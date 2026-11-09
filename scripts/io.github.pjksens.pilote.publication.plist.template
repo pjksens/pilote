@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Publication programmée de Pilote (08/11 : YouTube @sachaprljk @kryva_app, Instagram @sachaprljk @kryva.fr). Modèle : à copier
+     dans ~/Library/LaunchAgents/io.github.pjksens.pilote.publication.plist, puis :
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.github.pjksens.pilote.publication.plist
+     Toutes les minutes, l'outil regarde les publications (une requête sqlite) ; rien de prévu = il sort aussitôt, sans trousseau
+     ni réseau. YouTube : envoi privé avec publishAt (YouTube publie seul). Instagram : conteneur 20 min avant, publication à
+     l'heure ; Mac en veille à l'heure = launchd ne lance rien, au réveil plus de 30 min de retard = pas publiée (alerte).
+     Aucune clé ici : jetons au trousseau, client Google dans ~/Secrets (Shared/PublicationReseaux.swift). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.github.pjksens.pilote.publication</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vous/Projects/pilote/pilote</string>
+    <string>publication</string>
+    <string>--passe</string>
+  </array>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/vous/Library/Application Support/io.github.pjksens.pilote/publication.log</string>
+  <key>StandardErrorPath</key><string>/Users/vous/Library/Application Support/io.github.pjksens.pilote/publication.log</string>
+</dict>
+</plist>

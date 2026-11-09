@@ -1,0 +1,44 @@
+{
+  "prenom": "Camille",
+  "espaces": { "kryva": "Mon produit", "freelance": "Freelance", "autre": "Autre" },
+
+  "dossiers_sessions": [
+    { "nom": "Mon app", "chemin": "~/Projects/mon-app" },
+    { "nom": "Projets", "chemin": "~/Projects" }
+  ],
+  "routines": [
+    {
+      "id": "matin",
+      "titre": "Point du matin",
+      "detail": "Réponses reçues, relances à préparer",
+      "dossier": "~/Projects/mon-app",
+      "consigne": "Fais le point des réponses reçues et propose-moi les relances à préparer dans Pilote. Rien ne part sans mon accord."
+    }
+  ],
+  "facteur": {
+    "sessions": { "PILOTE": "local_00000000-0000-0000-0000-000000000000" },
+    "rappel": "Réponds en 5 lignes au plus."
+  },
+  "depot_suivi": "~/Projects/mon-app",
+
+  "rappels_calendrier": true,
+  "mail": false,
+  "entrants": false,
+  "publication": false,
+  "radar": false,
+  "dossier_secrets": "~/Secrets",
+  "domaines_interdits": ["mon-produit.example"],
+
+  "comptes": {
+    "url": "https://VOTRE-PROJET.supabase.co",
+    "cle": "UN JETON QUI NE PEUT QUE LIRE LA VUE pilote_comptes",
+    "vue": "pilote_comptes",
+    "stripe_cle": "rk_live_... (clé restreinte : Subscriptions, lecture seule)",
+    "exclure_ids": [],
+    "exclure_domaines": ["mon-produit.example"],
+    "espace": "kryva",
+    "compteur": { "dossier": "~/Projects/mon-app", "arguments": ["node", "scripts/compteur.mjs"] }
+  },
+
+  "synchro": null
+}

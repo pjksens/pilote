@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- File d'envoi des mails validés de Pilote (07/11). Modèle : à copier dans ~/Library/LaunchAgents/io.github.pjksens.pilote.file-envoi.plist,
+     puis : launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.github.pjksens.pilote.file-envoi.plist
+     Toutes les 30 s, l'outil regarde la file (une requête sqlite) ; rien en file = il sort aussitôt, sans trousseau ni réseau.
+     Un mail au plus par passe, 5 min après le précédent (Shared/FileEnvoi.swift). Aucune clé ici : le mot de passe Gmail est lu
+     dans le trousseau (« Toujours autoriser » donné une fois à l'outil : pilote gmail-acces). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.github.pjksens.pilote.file-envoi</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vous/Projects/pilote/pilote</string>
+    <string>file-envoi</string>
+    <string>--passe</string>
+  </array>
+  <key>StartInterval</key><integer>30</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/vous/Library/Application Support/io.github.pjksens.pilote/file-envoi.log</string>
+  <key>StandardErrorPath</key><string>/Users/vous/Library/Application Support/io.github.pjksens.pilote/file-envoi.log</string>
+</dict>
+</plist>

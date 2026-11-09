@@ -1,0 +1,48 @@
+# Construction
+build/
+Pilote.xcodeproj/
+/pilote
+/pilote.nouveau
+*.xcuserstate
+xcuserdata/
+DerivedData/
+
+# Données : jamais de base, de sauvegarde, de journal ni d'export dans le dépôt
+*.sqlite
+*.sqlite-*
+*.db
+*.jsonl
+*.log
+*.json.bak
+*.avant
+sauvegarde-*
+lot.json
+
+# Secrets
+.env*
+*.pem
+*.p12
+*.key
+Secrets/
+
+# Notes et fichiers de travail personnels
+ETAT.md
+EQUIPE.md
+IDEES.md
+EN-ATTENTE-SACHA.md
+CLAUDE.md
+.claude/
+passations/
+mesures/
+rapports/
+releves-disque/
+rangements/
+import/
+tmp/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
