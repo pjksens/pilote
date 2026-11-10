@@ -5,7 +5,9 @@ cd "$(dirname "$0")/.."
 APP=~/Applications/Pilote.app
 ID=io.github.pjksens.pilote   # Identite.app (Shared/Identite.swift), PRODUCT_BUNDLE_IDENTIFIER de project.yml
 # Une autre app nommée Pilote (autre identifiant) dans ~/Applications : on ne la ferme pas et on ne la remplace pas.
-AUTRE=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Contents/Info.plist" 2>/dev/null || true)
+AUTRE=""
+# Premier install : pas d'app, donc pas de plist (PlistBuddy écrirait « File Doesn't Exist » sur la sortie standard).
+[[ -f "$APP/Contents/Info.plist" ]] && AUTRE=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$APP/Contents/Info.plist" 2>/dev/null || true)
 if [[ "$1" != "--outil" && -n "$AUTRE" && "$AUTRE" != "$ID" ]]; then
   echo "~/Applications/Pilote.app est une autre app ($AUTRE) : rien n'est remplacé. Déplacez-la d'abord."
   exit 1
