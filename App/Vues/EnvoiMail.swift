@@ -111,7 +111,7 @@ struct EnvoiMail: View {
             etat.charger()
             fermer()
         } catch {
-            erreur = "Le mail n'est pas parti : \(error.localizedDescription)"
+            erreur = L("Le mail n'est pas parti : \(error.localizedDescription)")
             envoi = false
         }
     }

@@ -44,6 +44,7 @@ struct EcranUnique: View {
     /// Une pastille de domaine qui renvoie à sa ligne de « À toi » fait remonter l'écran (09/11).
     @State private var remonter = 0
     @State private var cibleDefilement = "atoi"
+    @State private var ancreDefilement: UnitPoint = .top
     @State private var masques: Set<String> = []
     @State private var enAttente: Attente?
     @State private var erreurGeste: String?
@@ -79,7 +80,7 @@ struct EcranUnique: View {
             .frame(maxWidth: 760, alignment: .leading)
             .padding(.horizontal, 32).padding(.top, 24).padding(.bottom, 64)
             .frame(maxWidth: .infinity)
-            .onChange(of: remonter) { _, _ in withAnimation(ressort) { defile.scrollTo(cibleDefilement, anchor: .top) } }
+            .onChange(of: remonter) { _, _ in withAnimation(ressort) { defile.scrollTo(cibleDefilement, anchor: ancreDefilement) } }
           }
         }
         .background(Color.fond)
@@ -91,7 +92,7 @@ struct EcranUnique: View {
         .onChange(of: agenda.tachesLues) { _, _ in tableau.taches(papiersLisibles ? agenda.taches : nil) }
     }
 
-    /// Essais seulement (jamais posés par l'app) : PILOTE_DEPLIER=ventes ouvre un domaine pour les captures, PILOTE_TOUT_VOIR=1 montre tout « À toi » ;
+    /// Essais seulement (jamais posés par l'app) : PILOTE_DEPLIER=ventes ouvre un domaine pour les captures, PILOTE_DEFILER=pilote y descend sans rien ouvrir, PILOTE_TOUT_VOIR=1 montre tout « À toi » ;
     /// PILOTE_MESURE_DEPLIAGE=1 déplie chaque domaine puis ouvre une page et revient, 4 fois, avec un intervalle
     /// os_signpost par geste (du changement d'état au rendu du cadre suivant), pour Instruments.
     private func essais() async {
@@ -117,6 +118,13 @@ struct EcranUnique: View {
             while !tableau.charge { try? await Task.sleep(for: .milliseconds(50)) }
             deplie = d
             try? await Task.sleep(for: .milliseconds(300))
+            cibleDefilement = "domaine:\(d.rawValue)"; remonter += 1
+        }
+        // PILOTE_DEFILER=pilote : l'écran fermé, descendu jusqu'à ce domaine (en bas), pour une capture qui le montre.
+        if let d = env["PILOTE_DEFILER"].flatMap(Domaine.depuis) {
+            while !tableau.charge { try? await Task.sleep(for: .milliseconds(50)) }
+            try? await Task.sleep(for: .milliseconds(600))
+            ancreDefilement = .bottom
             cibleDefilement = "domaine:\(d.rawValue)"; remonter += 1
         }
         if env["PILOTE_TOUT_VOIR"] == "1" { tousLesGestes = true }
@@ -220,13 +228,9 @@ struct EcranUnique: View {
 
     // MARK: En-tête
 
-    private static let formatDate: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "EEEE d MMMM"; return f
-    }()
-
     private var enTete: some View {
         HStack(alignment: .center) {
-            Text(Self.formatDate.string(from: Date()).capitalizedPremiere)
+            Text(Loc.date(Date(), "EEEEdMMMM").capitalizedPremiere)
                 .font(.titrePage).kerning(-0.5).foregroundStyle(Color.texte)
             Spacer()
             if tableau.miseAJour || (etat.premiereLecture && !tableau.charge) {
@@ -255,10 +259,10 @@ struct EcranUnique: View {
     private func alerteControle(_ s: SourcesATOI, _ lignes: [GesteSacha]) -> [String] {
         var a: [String] = []
         if agenda.accesRappels == .refuse {
-            a.append("Pilote n'a pas accès à Rappels : tes tâches et décisions ne peuvent pas s'afficher. Réglages Système, Confidentialité, Rappels.")
+            a.append(L("Pilote n'a pas accès à Rappels : tes tâches et décisions ne peuvent pas s'afficher. Réglages Système, Confidentialité, Rappels."))
         }
         if agenda.accesCalendrier == .refuse {
-            a.append("Pilote n'a pas accès au Calendrier : tes rendez-vous ne peuvent pas s'afficher. Réglages Système, Confidentialité, Calendriers.")
+            a.append(L("Pilote n'a pas accès au Calendrier : tes rendez-vous ne peuvent pas s'afficher. Réglages Système, Confidentialité, Calendriers."))
         }
         guard etat.premiereLecture else { return a }
         if let e = ControleATOI.alerte(ControleATOI.manquants(s, lignes: lignes, masques: masques)) { a.append(e) }
@@ -323,7 +327,7 @@ struct EcranUnique: View {
                         Button {
                             withAnimation(ressort) { tousLesGestes.toggle() }
                         } label: {
-                            Text(tousLesGestes ? "Voir moins" : "Voir tout")   // le nombre est déjà dans le titre (09/11)
+                            Text(tousLesGestes ? L("Voir moins") : L("Voir tout"))   // le nombre est déjà dans le titre (09/11)
                                 .font(.secondaire.weight(.medium)).foregroundStyle(Color.actionTexte)
                                 .padding(.horizontal, 16).padding(.vertical, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
@@ -344,33 +348,33 @@ struct EcranUnique: View {
     private func agir(_ g: GesteSacha) {
         switch g.action {
         case .validerTexte(let m):
-            differer(g, libelle: "Texte validé pour \(m.contact.nom)") { etat.valider(m, texte: m.evenement.texte) }
+            differer(g, libelle: L("Texte validé pour \(m.contact.nomAffiche)")) { etat.valider(m, texte: m.evenement.texte) }
         case .mettreEnFile(let m):
-            differer(g, libelle: "Mail pour \(m.contact.nom) mis dans la file d'envoi") {
+            differer(g, libelle: L("Mail pour \(m.contact.nomAffiche) mis dans la file d'envoi")) {
                 Task { if let e = await etat.mettreEnFile([m.id]) { echec(g, e) } }
             }
         case .marquerEnvoye(let m):
-            differer(g, libelle: "Marqué envoyé : \(m.contact.nom)") {
+            differer(g, libelle: L("Marqué envoyé : \(m.contact.nomAffiche)")) {
                 if let e = etat.marquer(m.id, statut: "envoye") { echec(g, e) }
             }
         case .cocherRappel(let r):
-            differer(g, libelle: "Fait : \(g.objet)") {
+            differer(g, libelle: L("Fait : \(g.objet)")) {
                 if let e = agenda.terminer(rappel: r) { echec(g, e) }
             }
         case .prospectFait(let c):
-            differer(g, libelle: "Fait : \(g.contexte)") { etat.actionFaite(c) }
+            differer(g, libelle: L("Fait : \(g.contexte)")) { etat.actionFaite(c) }
         case .tiktokPubliee(let p):
-            differer(g, libelle: "Publiée sur TikTok : \(g.objet)") {
-                guard let stock = etat.stock else { return echec(g, "La base de Pilote n'est pas ouverte.") }
+            differer(g, libelle: L("Publiée sur TikTok : \(g.objet)")) {
+                guard let stock = etat.stock else { return echec(g, L("La base de Pilote n'est pas ouverte.")) }
                 do { try Publications.marquerPubliee(stock, id: p.id, par: "\(Moi.nom) (app)") } catch { echec(g, "\(error)") }
             }
         case .validerPublication(let p):
-            differer(g, libelle: "Publication validée : \(g.objet)") {
-                guard let stock = etat.stock else { return echec(g, "La base de Pilote n'est pas ouverte.") }
+            differer(g, libelle: L("Publication validée : \(g.objet)")) {
+                guard let stock = etat.stock else { return echec(g, L("La base de Pilote n'est pas ouverte.")) }
                 do { try Publications.valider(stock, id: p.id, empreinte: p.empreinte, par: "\(Moi.nom) (app)") } catch { echec(g, "\(error)") }
             }
         case .videoFaite(let v, let action):
-            differer(g, libelle: "\(action == "tourner" ? "Tournée" : "Publiée") : \(v.sujet)") {
+            differer(g, libelle: action == "tourner" ? L("Tournée : \(v.sujet)") : L("Publiée : \(v.sujet)")) {
                 etat.marquerVideoJournee(jour: v.jour, compte: v.compte, action: action, fait: true)
             }
         case .choisir(let o):
@@ -378,7 +382,7 @@ struct EcranUnique: View {
         case .ouvrir(let u):
             NSWorkspace.shared.open(u)
         case .envoyerReponses(let rangs):
-            differer(g, libelle: rangs.count == 1 ? "Réponse envoyée" : "\(rangs.count) réponses envoyées") {
+            differer(g, libelle: L("\(rangs.count) réponses envoyées")) {
                 etat.envoyerReponses(rangs.filter { $0 >= 0 })   // rangs < 0 : réponses factices d'essai, rien ne part
             }
         case .deplier:
@@ -392,20 +396,20 @@ struct EcranUnique: View {
     private func choisir(_ g: GesteSacha, _ o: String) {
         switch g.genre {
         case .decision(let r):
-            differer(g, libelle: "Choix noté : \(o)") {
+            differer(g, libelle: L("Choix noté : \(Sessions.libelleChoix(o))")) {
                 do {
                     try Decisions.noter(question: Decisions.question(r.titre), choix: o, ref: r.id, liste: r.liste,
                                         pour: Decisions.pour(liste: r.liste, notes: r.notes))
-                } catch { return echec(g, "Le choix n'a pas pu être transmis : \(error.localizedDescription)") }
+                } catch { return echec(g, L("Le choix n'a pas pu être transmis : \(error.localizedDescription)")) }
                 etat.relireDecisions()
                 agenda.trancher(r, choix: o)
             }
         case .question(let q):
-            differer(g, libelle: "Réponse notée pour \(q.nom) : \(o)") {
+            differer(g, libelle: L("Réponse notée pour \(q.nom) : \(Sessions.libelleChoix(o))")) {
                 do {
                     try Decisions.noter(question: q.activite.question, choix: o, ref: q.activite.questionRef, liste: "Sessions",
                                         pour: q.nom, session: q.activite.sessionApp)
-                } catch { return echec(g, "Pas noté : \(error.localizedDescription)") }
+                } catch { return echec(g, L("Pas noté : \(error.localizedDescription)")) }
                 etat.relireDecisions()
             }
         default:
@@ -475,6 +479,7 @@ struct EcranUnique: View {
                 if let i = lignes.firstIndex(where: { $0.id == c.id }), i >= 3, lignes.count > Self.sansClic { tousLesGestes = true }
             }
         }
+        ancreDefilement = .top
         cibleDefilement = "atoi"; remonter += 1
     }
 
@@ -483,7 +488,7 @@ struct EcranUnique: View {
             Text("Où en est chaque domaine").font(.system(size: 22, weight: .bold)).foregroundStyle(Color.texte)
             VStack(spacing: 0) {
                 if let e = tableau.erreur, !tableau.charge {
-                    EtatErreur(texte: "Impossible de charger les domaines : \(e)") { tableau.reessayer() }
+                    EtatErreur(texte: L("Impossible de charger les domaines : \(e)")) { tableau.reessayer() }
                 } else if !tableau.charge {
                     ForEach(Domaine.allCases) { d in LigneSquelette(titre: d.titre, dernier: d == .pilote) }
                 } else {
@@ -536,14 +541,14 @@ struct LigneGeste: View {
                         HStack(spacing: 6) {
                             ForEach(Array(geste.choix.enumerated()), id: \.offset) { i, o in
                                 Button { choisir(o) } label: {
-                                    Text(o).font(.secondaire.weight(.semibold)).lineLimit(1)
+                                    Text(Sessions.libelleChoix(o)).font(.secondaire.weight(.semibold)).lineLimit(1)
                                         .foregroundStyle(principal && i == 0 ? Color.white : Color.actionTexte)
                                         .padding(.horizontal, 12).padding(.vertical, 5)
                                         .background(principal && i == 0 ? Color.action : Color.action.opacity(0.10),
                                                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                         .contentShape(RoundedRectangle(cornerRadius: 10))
                                 }
-                                .buttonStyle(.plain).help(o)
+                                .buttonStyle(.plain).help(Sessions.libelleChoix(o))
                                 .repere("choix:\(o)")
                             }
                             Button("Autre…", action: basculer).buttonStyle(.plain)
@@ -626,14 +631,14 @@ struct DetailGeste: View {
                 ForEach(l) { d in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(d.heure).font(.petit.monospacedDigit()).foregroundStyle(Color.texte3).frame(width: 40, alignment: .leading)
-                        Text("\(d.question) → \(d.choix)").font(.secondaire).foregroundStyle(Color.texte).lineLimit(1)
+                        Text("\(d.question) → \(Sessions.libelleChoix(d.choix))").font(.secondaire).foregroundStyle(Color.texte).lineLimit(1)
                         Spacer(minLength: 8)
                         Text("pour \(d.pour)").font(.petit).foregroundStyle(Color.texte3).fixedSize()
                         Button { etat.retirerReponse(d.id) } label: { Image(systemName: "xmark") }
                             .buttonStyle(.borderless).foregroundStyle(Color.texte3)
                             .help("Ne pas l'envoyer : \(d.pour) ne l'apprendra pas")
                     }
-                    .help("\(d.question)\n→ \(d.choix)")
+                    .help("\(d.question)\n→ \(Sessions.libelleChoix(d.choix))")
                 }
             }
             .padding(.leading, 44)
@@ -738,7 +743,7 @@ struct LigneDomaine: View {
                         .rotationEffect(.degrees(deplie ? 90 : 0))
                 }
                 if etat_.erreur != nil {
-                    PastilleDomaine(texte: "lecture impossible", ton: .rouge)
+                    PastilleDomaine(texte: L("lecture impossible"), ton: .rouge)
                 } else {
                     // 09/11 : la pastille dit le geste de Sacha (ou « Rien à faire pour toi ») ; le bilan, le travail des agents,
                     // avec les mots et les nombres des sections dépliées.
@@ -820,7 +825,7 @@ struct GroupeDeplie: View {
                 LigneElement(element: e, domaine: domaine, ouvrirGeste: ouvrirGeste)
             }
             if elements.count > 5 {
-                Button(tout ? "Voir moins" : "Voir tout (\(elements.count))") { tout.toggle() }
+                Button(tout ? L("Voir moins") : L("Voir tout (\(elements.count))")) { tout.toggle() }
                     .buttonStyle(.plain).font(.secondaire.weight(.medium)).foregroundStyle(Color.actionTexte)
                     .padding(.leading, 16).padding(.top, 2)
             }
@@ -858,7 +863,7 @@ struct EcrireAgent: View {
             }
             if ouvert || (enLigne && parti == nil) {
                 HStack(alignment: .bottom, spacing: 8) {
-                    TextField(sujet.map { "À \(domaine.agent), à propos de « \(Domaines.court($0, 60)) »" } ?? "Ton message à \(domaine.agent)",
+                    TextField(sujet.map { L("À \(domaine.agent), à propos de « \(Domaines.court($0, 60)) »") } ?? L("Ton message à \(domaine.agent)"),
                               text: $texte, axis: .vertical)
                         .textFieldStyle(.roundedBorder).lineLimit(1...4)
                         .onSubmit(envoyer)
@@ -879,7 +884,7 @@ struct EcrireAgent: View {
         guard !t.isEmpty else { return }
         do {
             try Self.envoyer(etat, a: domaine.equipe, sujet: sujet, texte: t, qui: "\(Moi.nom)")
-            parti = "Parti pour \(domaine.agent)"
+            parti = L("Parti pour \(domaine.agent)")
             erreur = nil
             texte = ""
             withAnimation(.snappy) { ouvert = false }
@@ -891,7 +896,7 @@ struct EcrireAgent: View {
             texte = ""
             withAnimation(.snappy) { ouvert = false }
         } catch {
-            erreur = "Pas parti : \(error.localizedDescription)"
+            erreur = L("Pas parti : \(error.localizedDescription)")
         }
     }
 }

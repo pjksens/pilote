@@ -154,7 +154,7 @@ them. For each item, only write what you actually verified.
   <br><sub>Demo-Modus (<code>./scripts/demo.sh</code>): erfundene Daten, keine echten Personen.</sub>
 </p>
 
-> Die Oberfläche der App und ihre Code-Kommentare sind auf Französisch. Dieses README gibt es in neun Sprachen; die App (noch) nicht.
+> Die Oberfläche der App folgt der Sprache deines Macs: Englisch, Französisch oder Spanisch (Englisch für jede andere Sprache). Code-Kommentare, das Kommandozeilenwerkzeug `pilote` und der MCP-Server bleiben auf Französisch. Dieses README gibt es in neun Sprachen.
 
 ## Was Pilote kann
 
@@ -172,6 +172,7 @@ them. For each item, only write what you actually verified.
   durchsuche alles (⌘K) über Projekte, Kontakte, Journal und Dateien (Spotlight).
 - **E-Mail unter Kontrolle.** Eine vorbereitete E-Mail geht erst raus, wenn du klickst, von deinem Gmail aus (SMTP,
   App-Passwort im macOS-Schlüsselbund, von Claude nie gelesen). Reiner Text, Antworten bleiben im richtigen Thread.
+- **Pip, optional.** Ist [Pip](https://github.com/pjksens/heypip) (eine Notch-App für den Mac, die Gespräche begleitet) installiert, erscheint bei einem Videoanruf aus deinem Kalender ein Button „Launch Pip“: Pip öffnet sich mit dem Namen des Anrufs und dem verknüpften Kontakt. Optional öffnet Pilote es zwei Minuten vorher von selbst. Pip nimmt erst nach deinem eigenen Klick auf, und sobald Claude die Zusammenfassung geschrieben hat, legt Pilote sie im Verlauf des Kontakts ab. Es liest deinen Kalender und folgt deshalb `rappels_calendrier`, standardmäßig aus.
 - **Veröffentlichen.** Plane Videos auf YouTube, Instagram und TikTok, mit einer ausdrücklichen Freigabe vor jeder
   Veröffentlichung (Tokens im Schlüsselbund).
 - **Radar.** Beobachte Social-Media-Konten (Aufrufe, Veröffentlichungsrhythmus, Ideen), von Hand eingetragen oder über
@@ -187,7 +188,7 @@ Deine Sitzungen erledigen die Arbeit; in Pilote siehst du sie und antwortest ihn
 </p>
 
 Braucht eine Sitzung eine Entscheidung, erscheint ihre Frage mit den passenden Schaltflächen auf dem Startbildschirm.
-Deine Antwort wartet unter **„Vos réponses, prêtes à partir“** (deine Antworten, versandbereit), bis du auf **Envoyer**
+Deine Antwort wartet unter **„Your replies, ready to go“** (deine Antworten, versandbereit), bis du auf **Send**
 (senden) klickst: Nichts erreicht eine Sitzung versehentlich.
 
 <p align="center">
@@ -196,7 +197,7 @@ Deine Antwort wartet unter **„Vos réponses, prêtes à partir“** (deine Ant
 </p>
 
 > **Wie deine Antworten zu den Sitzungen kommen:** [`scripts/facteur.py`](scripts/facteur.py), der „Facteur“ (der Briefträger).
-> Der Button **Démarrer le Facteur** auf dem Startbildschirm öffnet eine Claude-Code-Sitzung mit seinen Anweisungen: Sie
+> Der Button **Start Facteur** auf dem Startbildschirm öffnet eine Claude-Code-Sitzung mit seinen Anweisungen: Sie
 > wartet im Hintergrund und stellt jede Antwort innerhalb von Sekunden der richtigen Sitzung zu. Das ist die Sitzung, die
 > gefragt hat oder der du geschrieben hast; sonst die in `facteur.sessions` in `reglages.json` genannte; sonst die aus der
 > Tabelle in `EQUIPE.md`. Im Code steht keine Sitzungs-ID.
@@ -228,9 +229,9 @@ von ihrem eigenen Fenster auf: keine Berechtigung zur Bildschirmaufnahme nötig.
 
 | | |
 |---|---|
-| ![Agenten: die Claude-Code-Sitzungen und ihr Journal](docs/captures/10-claude.png) | ![Kontakte: das Adressbuch, die Phase und die nächste Aktion](docs/captures/04-contacts.png) |
+| ![Agenten: die Claude-Code-Sitzungen und ihr Journal](docs/captures/09-claude.png) | ![Kontakte: das Adressbuch, die Phase und die nächste Aktion](docs/captures/04-contacts.png) |
 | ![Prospects: das Board nach Phasen](docs/captures/03-prospects.png) | ![Videos: die Woche, zwei Konten](docs/captures/05-semaine.png) |
-| ![Aufgaben: eine Karte ziehen, um ihren Tag zu ändern](docs/captures/08-taches.png) | ![Startbildschirm im Dunkelmodus](docs/captures/01-aujourdhui-sombre.png) |
+| ![Aufgaben: eine Karte ziehen, um ihren Tag zu ändern](docs/captures/07-taches.png) | ![Startbildschirm im Dunkelmodus](docs/captures/01-aujourdhui-sombre.png) |
 
 Alle Daten in den Screenshots sind erfunden (Namen, Firmen, Telefonnummern im französischen Fiktionsbereich
 06 39 98 00 0x, Adressen auf `.example`).
@@ -319,7 +320,7 @@ gesamte Datenbank, lesend und schreibend, und umgeht die Row-Level-Security. Mac
 
 **Stripe** (`stripe_cle`, optional): ein **eingeschränkter Schlüssel** (`rk_…`) mit der einzigen Berechtigung
 „Subscriptions: Read“. Er unterscheidet Testphasen von zahlenden Konten; ohne ihn erscheint ein Konto mit Abonnement
-als „À vérifier“ (zu prüfen).
+als „To check“ (zu prüfen).
 
 **Zähler** (`compteur`, optional): ein eigener Befehl von dir, ausgeführt in `dossier`, der eine Zeile `ACTIFS 7 / 10`
 ausgibt, dann Abschnittstitel, gefolgt von Zeilen, die mit zwei Leerzeichen eingerückt sind.

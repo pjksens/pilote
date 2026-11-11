@@ -59,10 +59,10 @@ enum Mail {
         case pasDeGmail
         var errorDescription: String? {
             switch self {
-            case .nonAutorise: return "Pilote n'a pas accès à Mail. Réglages Système › Confidentialité › Automatisation › Pilote › Mail."
-            case .echec(let m) where m.contains("4401"): return "Le mail d'origine n'est pas dans Mail : envoi en réponse impossible."
-            case .echec: return "Mail n'a pas répondu."
-            case .pasDeGmail: return "Aucun compte Gmail dans Mail.app. Ajoutez-le dans Mail › Réglages › Comptes."
+            case .nonAutorise: return L("Pilote n'a pas accès à Mail. Réglages Système › Confidentialité › Automatisation › Pilote › Mail.")
+            case .echec(let m) where m.contains("4401"): return L("Le mail d'origine n'est pas dans Mail : envoi en réponse impossible.")
+            case .echec: return L("Mail n'a pas répondu.")
+            case .pasDeGmail: return L("Aucun compte Gmail dans Mail.app. Ajoutez-le dans Mail › Réglages › Comptes.")
             }
         }
     }

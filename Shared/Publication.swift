@@ -179,7 +179,8 @@ struct DemandePublication {
 
 struct RefusPublication: Error, CustomStringConvertible {
     let raisons: [String]
-    var description: String { "Refusé, rien n'est programmé : " + raisons.joined(separator: " ; ") }
+    /// Montré à l'écran par l'app (les raisons le sont déjà dans sa langue) ; l'outil en ligne de commande reste en français.
+    var description: String { L("Refusé, rien n'est programmé : \(raisons.joined(separator: Loc.estFrancais ? " ; " : "; "))") }
 }
 
 /// Ce que dit la plateforme d'une erreur : la suite à donner en dépend.
@@ -277,6 +278,8 @@ enum Publications {
     /// Instagram : conteneur créé 20 min avant l'heure ; plus de 30 min de retard = pas publiée.
     static let preparationIG: TimeInterval = 20 * 60
     static let retardMax: TimeInterval = 30 * 60
+    /// Instagram garde un conteneur 24 h : gardé après l'essai seulement s'il vit jusqu'à l'heure (1 h de marge).
+    static let dureeConteneurIG: TimeInterval = 23 * 3600
     /// YouTube : l'heure doit être encore devant au moment de l'envoi (2 min au moins).
     static let margeYouTube: TimeInterval = 2 * 60
     /// YouTube : relue 3 min après l'heure, puis toutes les 10 min ; toujours privée 3 h après = échec.
@@ -440,6 +443,17 @@ enum Publications {
 
     // MARK: Vérifications
 
+    /// La définition minimale : 4K, 2160×3840 (règle de Sacha du 09/11 : jamais en dessous sans son accord écrit).
+    /// Couchée (3840×2160), elle passe aussi. Les tests la baissent pour leurs petites vidéos.
+    static var definitionMinimale = (petit: 2160, grand: 3840)
+
+    /// Sous la 4K : la raison du refus, à la programmation (rien n'est programmé). nil : 4K ou plus.
+    static func refusSous4K(_ i: InfosVideo) -> String? {
+        let m = definitionMinimale
+        guard min(i.largeur, i.hauteur) < m.petit || max(i.largeur, i.hauteur) < m.grand else { return nil }
+        return L("vidéo en \(i.largeur)×\(i.hauteur) : sous la 4K (2160×3840), Pilote ne la publie pas. L'exporter en 4K, puis la reprogrammer")
+    }
+
     struct InfosVideo: Equatable { var duree: Double; var largeur: Int; var hauteur: Int }
 
     /// Durée et taille d'image (rotation comprise). nil : illisible par AVFoundation.
@@ -467,19 +481,32 @@ enum Publications {
 
     /// Ce qui sert de couverture, en clair (montré à Sacha avant qu'il valide).
     static func couvertureTexte(_ p: Publication) -> String {
-        let instant = p.couvertureMs >= 0 ? String(format: "%.1f s", Double(p.couvertureMs) / 1000).replacingOccurrences(of: ".", with: ",") : ""
-        guard p.aCouverture else { return "aucune choisie (la plateforme prend la sienne)" }
+        let instant = p.couvertureMs >= 0 ? secondes(Double(p.couvertureMs) / 1000) + " s" : ""
+        guard p.aCouverture else { return L("aucune choisie (la plateforme prend la sienne)") }
         switch p.reseau {
         case .youtube:
-            let etat = p.couvertureEtat == "posee" ? " ; posée chez YouTube"
-                : p.couvertureEtat.hasPrefix("refusee") ? " ; " + p.couvertureEtat.replacingOccurrences(of: "refusee : ", with: "pas posée : ")
-                : " ; posée après le traitement de la vidéo"
-            return (instant.isEmpty || !p.couverture.hasSuffix("-\(p.couvertureMs).jpg") ? "image \(URL(fileURLWithPath: p.couverture).lastPathComponent)"
-                    : "l'image de la vidéo à \(instant)") + etat
+            let etat = p.couvertureEtat == "posee" ? L("posée chez YouTube")
+                : p.couvertureEtat.hasPrefix("refusee") ? L("pas posée : \(p.couvertureEtat.replacingOccurrences(of: "refusee : ", with: ""))")
+                : L("posée après le traitement de la vidéo")
+            let image = instant.isEmpty || !p.couverture.hasSuffix("-\(p.couvertureMs).jpg")
+                ? L("image \(URL(fileURLWithPath: p.couverture).lastPathComponent)") : L("l'image de la vidéo à \(instant)")
+            return image + (Loc.estFrancais ? " ; " : "; ") + etat
         case .instagram:
-            return instant.isEmpty ? "1re image de la vidéo (l'API Instagram ne prend pas l'image choisie)" : "l'image de la vidéo à \(instant)"
+            return instant.isEmpty ? L("1re image de la vidéo (l'API Instagram ne prend pas l'image choisie)") : L("l'image de la vidéo à \(instant)")
         case .tiktok:
-            return "à choisir dans TikTok en publiant le brouillon" + (instant.isEmpty ? "" : " (l'image de la vidéo à \(instant))")
+            return L("à choisir dans TikTok en publiant le brouillon") + (instant.isEmpty ? "" : " " + L("(l'image de la vidéo à \(instant))"))
+        }
+    }
+
+    /// Des secondes avec une décimale, au format de la langue de l'app (« 1,5 » en français et en espagnol, « 1.5 » en anglais).
+    static func secondes(_ s: Double) -> String { s.formatted(.number.precision(.fractionLength(1)).locale(Loc.locale)) }
+
+    /// Un texte entre guillemets, à la mode de la langue de l'app (« … » en français et en espagnol, “…” en anglais).
+    static func entreGuillemets(_ t: String) -> String {
+        switch Loc.langue {
+        case "en": return "“\(t)”"
+        case "es": return "«\(t)»"
+        default: return "« \(t) »"
         }
     }
 
@@ -496,50 +523,55 @@ enum Publications {
     }
 
     /// Les raisons de refuser (vides = OK) et les avertissements (montrés, n'empêchent rien).
+    /// `sonde` (ffprobe) : la taille comptée pour Instagram et TikTok est celle de leur copie (débit ramené à leur profil).
     static func verifier(compte: String, titre: String, texte: String, prevuLe: Date, fichier: URL, taille: Int, infos: InfosVideo?,
-                         maintenant: Date) -> (refus: [String], avertissements: [String]) {
+                         sonde: CopieReseau.Sonde? = nil, maintenant: Date) -> (refus: [String], avertissements: [String]) {
         var refus: [String] = [], avert: [String] = []
         guard let c = ComptePublication.trouver(compte) else {
-            return (["compte inconnu « \(compte) » (\(ComptePublication.tous.map(\.id).joined(separator: ", ")))"], [])
+            return ([L("compte inconnu « \(compte) » (\(ComptePublication.tous.map(\.id).joined(separator: ", ")))")], [])
         }
-        if prevuLe < maintenant.addingTimeInterval(avanceMin) { refus.append("heure trop proche ou passée : au moins 15 min à l'avance") }
-        if prevuLe > maintenant.addingTimeInterval(avanceMax) { refus.append("heure à plus de 6 mois") }
-        if !extensions.contains(fichier.pathExtension.lowercased()) { refus.append("format « .\(fichier.pathExtension) » : .mp4 ou .mov seulement") }
-        if taille <= 0 { refus.append("fichier vide") }
-        if infos == nil { refus.append("vidéo illisible (fichier abîmé ou pas une vidéo)") }
+        if prevuLe < maintenant.addingTimeInterval(avanceMin) { refus.append(L("heure trop proche ou passée : au moins 15 min à l'avance")) }
+        if prevuLe > maintenant.addingTimeInterval(avanceMax) { refus.append(L("heure à plus de 6 mois")) }
+        if !extensions.contains(fichier.pathExtension.lowercased()) { refus.append(L("format « .\(fichier.pathExtension) » : .mp4 ou .mov seulement")) }
+        if taille <= 0 { refus.append(L("fichier vide")) }
+        if infos == nil { refus.append(L("vidéo illisible (fichier abîmé ou pas une vidéo)")) }
         switch c.reseau {
         case .youtube:
             let t = titre.trimmingCharacters(in: .whitespacesAndNewlines)
-            if t.isEmpty { refus.append("titre YouTube vide") }
-            if t.count > 100 { refus.append("titre YouTube de \(t.count) caractères (100 au plus)") }
+            if t.isEmpty { refus.append(L("titre YouTube vide")) }
+            if t.count > 100 { refus.append(L("titre YouTube de \(t.count) caractères (100 au plus)")) }
             if titre.contains("<") || titre.contains(">") || texte.contains("<") || texte.contains(">") {
-                refus.append("YouTube refuse les signes < et > dans le titre et la description")
+                refus.append(L("YouTube refuse les signes < et > dans le titre et la description"))
             }
-            if texte.utf8.count > 5000 { refus.append("description YouTube trop longue (5 000 octets au plus)") }
+            if texte.utf8.count > 5000 { refus.append(L("description YouTube trop longue (5 000 octets au plus)")) }
             if let i = infos {
-                if i.duree > 180 { avert.append("vidéo de \(Int(i.duree)) s : au-delà de 3 min, YouTube n'en fait pas un Short") }
-                if i.hauteur <= i.largeur { avert.append("vidéo pas verticale (\(i.largeur)×\(i.hauteur)) : YouTube n'en fera pas un Short") }
+                if i.duree > 180 { avert.append(L("vidéo de \(Int(i.duree)) s : au-delà de 3 min, YouTube n'en fait pas un Short")) }
+                if i.hauteur <= i.largeur { avert.append(L("vidéo pas verticale (\(i.largeur)×\(i.hauteur)) : YouTube n'en fera pas un Short")) }
             }
         case .instagram:
-            if !titre.trimmingCharacters(in: .whitespaces).isEmpty { avert.append("Instagram n'a pas de titre : seule la légende part") }
-            if texte.count > 2200 { refus.append("légende Instagram de \(texte.count) caractères (2 200 au plus)") }
-            if texte.split(separator: "#", omittingEmptySubsequences: false).count - 1 > 30 { refus.append("plus de 30 hashtags (Instagram refuse)") }
-            if texte.split(separator: "@", omittingEmptySubsequences: false).count - 1 > 20 { refus.append("plus de 20 mentions @ (Instagram refuse)") }
-            if taille > tailleMaxIG { refus.append("vidéo de plus de 300 Mo (Instagram refuse)") }
+            if !titre.trimmingCharacters(in: .whitespaces).isEmpty { avert.append(L("Instagram n'a pas de titre : seule la légende part")) }
+            if texte.count > 2200 { refus.append(L("légende Instagram de \(texte.count) caractères (2 200 au plus)")) }
+            if texte.split(separator: "#", omittingEmptySubsequences: false).count - 1 > 30 { refus.append(L("plus de 30 hashtags (Instagram refuse)")) }
+            if texte.split(separator: "@", omittingEmptySubsequences: false).count - 1 > 20 { refus.append(L("plus de 20 mentions @ (Instagram refuse)")) }
+            if (sonde.map { CopieReseau.tailleEstimee($0, CopieReseau.instagram, tailleSource: taille) } ?? taille) > tailleMaxIG {
+                refus.append(L("vidéo de plus de 300 Mo (Instagram refuse)"))
+            }
             if let i = infos {
-                if i.duree < 3 { refus.append("vidéo de moins de 3 s (Instagram refuse)") }
-                if i.duree > 900 { refus.append("vidéo de plus de 15 min (Instagram refuse)") }
-                if i.hauteur <= i.largeur { avert.append("vidéo pas verticale (\(i.largeur)×\(i.hauteur)) : recadrée en Reel") }
+                if i.duree < 3 { refus.append(L("vidéo de moins de 3 s (Instagram refuse)")) }
+                if i.duree > 900 { refus.append(L("vidéo de plus de 15 min (Instagram refuse)")) }
+                if i.hauteur <= i.largeur { avert.append(L("vidéo pas verticale (\(i.largeur)×\(i.hauteur)) : recadrée en Reel")) }
             }
         case .tiktok:
-            if !titre.trimmingCharacters(in: .whitespaces).isEmpty { avert.append("TikTok n'a pas de titre : seule la légende compte") }
+            if !titre.trimmingCharacters(in: .whitespaces).isEmpty { avert.append(L("TikTok n'a pas de titre : seule la légende compte")) }
             // TikTok : l'API du brouillon ne prend pas la légende ; Sacha la colle dans l'app (2 200 caractères au plus).
-            if texte.count > 2200 { refus.append("légende TikTok de \(texte.count) caractères (2 200 au plus)") }
-            if taille > tailleMaxTT { refus.append("vidéo de plus de 4 Go (TikTok refuse)") }
-            avert.append("TikTok : Pilote envoie un brouillon dans la boîte TikTok 15 min avant l'heure ; \(Moi.nom) le publie depuis l'app (légende à coller)")
+            if texte.count > 2200 { refus.append(L("légende TikTok de \(texte.count) caractères (2 200 au plus)")) }
+            if (sonde.map { CopieReseau.tailleEstimee($0, CopieReseau.tiktok, tailleSource: taille) } ?? taille) > tailleMaxTT {
+                refus.append(L("vidéo de plus de 4 Go (TikTok refuse)"))
+            }
+            avert.append(L("TikTok : Pilote envoie un brouillon dans la boîte TikTok 15 min avant l'heure ; Sacha le publie depuis l'app (légende à coller)"))
             if let i = infos {
-                if i.duree > 600 { avert.append("vidéo de \(Int(i.duree)) s : au-delà de 10 min, TikTok peut la refuser") }
-                if i.hauteur <= i.largeur { avert.append("vidéo pas verticale (\(i.largeur)×\(i.hauteur))") }
+                if i.duree > 600 { avert.append(L("vidéo de \(Int(i.duree)) s : au-delà de 10 min, TikTok peut la refuser")) }
+                if i.hauteur <= i.largeur { avert.append(L("vidéo pas verticale (\(i.largeur)×\(i.hauteur))")) }
             }
         }
         return (refus, avert)
@@ -560,28 +592,40 @@ enum Publications {
                            maintenant: Date = Date()) throws -> Programmees {
         let source = URL(fileURLWithPath: Chemins.complet(d.fichier)).standardizedFileURL
         guard FileManager.default.isReadableFile(atPath: source.path) else {
-            throw RefusPublication(raisons: ["vidéo introuvable ou illisible : \(source.path)"])
+            throw RefusPublication(raisons: [L("vidéo introuvable ou illisible : \(source.path)")])
         }
         let comptes = Array(NSOrderedSet(array: d.comptes.map { $0.lowercased() })) as? [String] ?? d.comptes
-        guard !comptes.isEmpty else { throw RefusPublication(raisons: ["aucun compte choisi"]) }
+        guard !comptes.isEmpty else { throw RefusPublication(raisons: [L("aucun compte choisi")]) }
         let taille = (try? FileManager.default.attributesOfItem(atPath: source.path)[.size] as? Int) ?? 0
         let infos = infosVideo(source)
         let sha = try empreinteFichier(source)
+        // Instagram et TikTok : une copie à leur profil (CopieReseau) ; ffprobe d'abord, pour refuser ici ce qui ne passera pas.
+        let reseauxCopie = Set(comptes.compactMap { ComptePublication.trouver($0)?.reseau }).filter { CopieReseau.profil($0) != nil }
+        let sonde = reseauxCopie.isEmpty ? nil : CopieReseau.sonder(source)
         // La seconde près suffit (l'heure est montrée à la minute) : l'empreinte ne dépend pas des millisecondes.
         let prevu = Date(timeIntervalSince1970: d.prevuLe.timeIntervalSince1970.rounded(.down))
         let prevuLe = Dates.iso.string(from: prevu)
         var refus: [String] = [], avert: [String] = []
         for c in comptes {
-            let v = verifier(compte: c, titre: d.titre, texte: d.texte, prevuLe: prevu, fichier: source, taille: taille, infos: infos, maintenant: maintenant)
+            let v = verifier(compte: c, titre: d.titre, texte: d.texte, prevuLe: prevu, fichier: source, taille: taille, infos: infos,
+                             sonde: sonde, maintenant: maintenant)
             let nom = ComptePublication.trouver(c)?.nom ?? c
-            refus += v.refus.map { comptes.count > 1 ? "\(nom) : \($0)" : $0 }
-            avert += v.avertissements.map { comptes.count > 1 ? "\(nom) : \($0)" : $0 }
+            // Pas de L() : la clé ne serait que « %@ : %@ » (sans mot, le catalogue l'ignore). L'espace avant « : » n'est que français.
+            let deuxPoints = Loc.estFrancais ? " : " : ": "
+            refus += v.refus.map { comptes.count > 1 ? nom + deuxPoints + $0 : $0 }
+            avert += v.avertissements.map { comptes.count > 1 ? nom + deuxPoints + $0 : $0 }
+            // Déjà là : la même source, ou sa copie pour ce réseau (faite par une programmation précédente).
+            var shaCopie = sha
+            if let r = ComptePublication.trouver(c)?.reseau, let pr = CopieReseau.profil(r) {
+                let u = CopieReseau.chemin(dossier: dossier, empreinteSource: sha, profil: pr)
+                if FileManager.default.fileExists(atPath: u.path) { shaCopie = (try? empreinteFichier(u)) ?? sha }
+            }
             let deja = try stock.base.lignes("""
-                SELECT prevu_le FROM publications WHERE compte = ? AND empreinte_fichier = ?
+                SELECT prevu_le FROM publications WHERE compte = ? AND empreinte_fichier IN (?, ?)
                 AND etat IN ('a_valider', 'planifie', 'envoi', 'envoye', 'reconnexion', 'publie')
-                """, [c, sha])
+                """, [c, sha, shaCopie])
             if let p = deja.first?["prevu_le"] as? String {
-                refus.append("\(nom) : cette vidéo y est déjà programmée ou publiée (\(heureParis(p)))")
+                refus.append(L("\(nom) : cette vidéo y est déjà programmée ou publiée (\(heureAffichee(p)))"))
             }
         }
         // La couverture : une image et/ou un instant de la vidéo.
@@ -590,30 +634,37 @@ enum Publications {
         let couvertureMs = d.couvertureA.map { Int(($0 * 1000).rounded()) } ?? -1
         if let i = imageSource {
             let taille = (try? FileManager.default.attributesOfItem(atPath: i.path)[.size] as? Int) ?? 0
-            if !FileManager.default.isReadableFile(atPath: i.path) { refus.append("image de couverture introuvable : \(i.path)") }
-            else if !extensionsImage.contains(i.pathExtension.lowercased()) { refus.append("couverture « .\(i.pathExtension) » : .jpg ou .png seulement") }
-            else if taille <= 0 || taille > tailleMaxCouverture { refus.append("image de couverture vide ou de plus de 50 Mo") }
+            if !FileManager.default.isReadableFile(atPath: i.path) { refus.append(L("image de couverture introuvable : \(i.path)")) }
+            else if !extensionsImage.contains(i.pathExtension.lowercased()) { refus.append(L("couverture « .\(i.pathExtension) » : .jpg ou .png seulement")) }
+            else if taille <= 0 || taille > tailleMaxCouverture { refus.append(L("image de couverture vide ou de plus de 50 Mo")) }
             else if taille > 2 * 1024 * 1024 && comptes.contains(where: { ComptePublication.trouver($0)?.reseau == .youtube }) {
-                avert.append("couverture de plus de 2 Mo : YouTube Studio limite les miniatures à 2 Mo, l'API peut la refuser")
+                avert.append(L("couverture de plus de 2 Mo : YouTube Studio limite les miniatures à 2 Mo, l'API peut la refuser"))
             }
         }
         if let a = d.couvertureA {
             if a < 0 || (infos.map { a >= $0.duree } ?? false) {
-                refus.append("instant de couverture \(a) s hors de la vidéo (\(infos.map { "0 à \(Int($0.duree)) s" } ?? "durée illisible"))")
+                let plage = infos.map { L("0 à \(Int($0.duree)) s") } ?? L("durée illisible")
+                refus.append(L("instant de couverture \(secondes(a)) s hors de la vidéo (\(plage))"))
             }
         }
         if imageSource != nil || couvertureMs >= 0 {
             let reseaux = Set(comptes.compactMap { ComptePublication.trouver($0)?.reseau })
             if reseaux.contains(.instagram) {
-                avert.append(couvertureMs >= 0
-                    ? "Instagram : couverture = l'image de la vidéo à \(String(format: "%.1f", Double(couvertureMs) / 1000)) s\(imageSource != nil ? " (l'image choisie ne passe pas : l'API ne la prend que depuis un serveur public)" : "")"
-                    : "Instagram : l'API ne prend une image de couverture que depuis un serveur public ; donner un instant de la vidéo, sinon Instagram prend la 1re image")
+                // Français : « 1.5 » tel que l'outil l'a toujours écrit (les tests le relisent) ; ailleurs, la décimale de la langue.
+                let instant = Loc.estFrancais ? String(format: "%.1f", Double(couvertureMs) / 1000) : secondes(Double(couvertureMs) / 1000)
+                avert.append(couvertureMs < 0
+                    ? L("Instagram : l'API ne prend une image de couverture que depuis un serveur public ; donner un instant de la vidéo, sinon Instagram prend la 1re image")
+                    : imageSource != nil
+                        ? L("Instagram : couverture = l'image de la vidéo à \(instant) s (l'image choisie ne passe pas : l'API ne la prend que depuis un serveur public)")
+                        : L("Instagram : couverture = l'image de la vidéo à \(instant) s"))
             }
             if reseaux.contains(.youtube) {
-                avert.append("YouTube : miniature posée après le traitement de la vidéo ; si la chaîne n'a pas le droit aux miniatures personnalisées, YouTube garde la sienne (Pilote prévient)")
+                avert.append(L("YouTube : miniature posée après le traitement de la vidéo ; si la chaîne n'a pas le droit aux miniatures personnalisées, YouTube garde la sienne (Pilote prévient)"))
             }
-            if reseaux.contains(.tiktok) { avert.append("TikTok : l'API ne prend pas de couverture ; \(Moi.nom) la choisit dans TikTok en publiant le brouillon") }
+            if reseaux.contains(.tiktok) { avert.append(L("TikTok : l'API ne prend pas de couverture ; Sacha la choisit dans TikTok en publiant le brouillon")) }
         }
+        for r in reseauxCopie.sorted(by: { $0.rawValue < $1.rawValue }) { refus += CopieReseau.refus(sonde, reseau: r) }
+        if let i = infos, let r = refusSous4K(i) { refus.append(r) }
         refus = Array(NSOrderedSet(array: refus)) as? [String] ?? refus
         guard refus.isEmpty else { throw RefusPublication(raisons: refus) }
 
@@ -626,7 +677,7 @@ enum Publications {
             if clonefile(source.path, tmp.path, 0) != 0 { try FileManager.default.copyItem(at: source, to: tmp) }
             guard try empreinteFichier(tmp) == sha else {
                 try? FileManager.default.removeItem(at: tmp)
-                throw RefusPublication(raisons: ["la vidéo a changé pendant la copie : réessayer quand elle est finie d'écrire"])
+                throw RefusPublication(raisons: [L("la vidéo a changé pendant la copie : réessayer quand elle est finie d'écrire")])
             }
             try FileManager.default.moveItem(at: tmp, to: copie)
         }
@@ -636,28 +687,40 @@ enum Publications {
             let sha = try empreinteFichier(i)
             let c = dossier.appendingPathComponent("\(sha.prefix(16)).\(i.pathExtension.lowercased() == "png" ? "png" : "jpg")")
             if !FileManager.default.fileExists(atPath: c.path) { try FileManager.default.copyItem(at: i, to: c) }
-            guard try empreinteFichier(c) == sha else { throw RefusPublication(raisons: ["l'image de couverture a changé pendant la copie : réessayer"]) }
+            guard try empreinteFichier(c) == sha else { throw RefusPublication(raisons: [L("l'image de couverture a changé pendant la copie : réessayer")]) }
             couverture = c.path; shaCouverture = sha
         } else if couvertureMs >= 0 {
             let c = dossier.appendingPathComponent("\(sha.prefix(16))-\(couvertureMs).jpg")
             if !FileManager.default.fileExists(atPath: c.path) {
                 guard imageDeLaVideo(copie, a: Double(couvertureMs) / 1000, vers: c) else {
-                    throw RefusPublication(raisons: ["image de la vidéo à \(Double(couvertureMs) / 1000) s illisible : choisir un autre instant"])
+                    throw RefusPublication(raisons: [L("image de la vidéo à \(secondes(Double(couvertureMs) / 1000)) s illisible : choisir un autre instant")])
                 }
             }
             couverture = c.path; shaCouverture = try empreinteFichier(c)
         }
+        // Les copies Instagram et TikTok, et leur empreinte : c'est elle que Sacha valide et qui est relue avant l'envoi.
+        var copies: [ReseauPublication: (url: URL, sha: String, taille: Int)] = [:]
+        if let sonde {
+            for r in reseauxCopie {
+                let u = try CopieReseau.preparer(source: source, sonde: sonde, reseau: r, empreinteSource: sha, dossier: dossier)
+                let t = (try? FileManager.default.attributesOfItem(atPath: u.path)[.size] as? Int) ?? 0
+                if r == .instagram && t > tailleMaxIG { throw RefusPublication(raisons: [L("vidéo de plus de 300 Mo (Instagram refuse)")]) }
+                if r == .tiktok && t > tailleMaxTT { throw RefusPublication(raisons: [L("vidéo de plus de 4 Go (TikTok refuse)")]) }
+                copies[r] = (u, try empreinteFichier(u), t)
+            }
+        }
         let m = Dates.iso.string(from: maintenant)
         let plugkit = d.plugkit.isEmpty ? idPlugKit(dans: d.par) : d.plugkit
         if validee && !plugkit.isEmpty {
-            throw RefusPublication(raisons: ["venue de PlugKit (\(plugkit)) : elle se programme « à valider », la validation écrit le REVEIL de retrait pour PILOTE"])
+            throw RefusPublication(raisons: [L("venue de PlugKit (\(plugkit)) : elle se programme « à valider », la validation écrit le REVEIL de retrait pour PILOTE")])
         }
         var ids: [String] = []
         try stock.base.transaction {
             for c in comptes {
                 let id = UUID().uuidString.lowercased()
                 let titre = ComptePublication.trouver(c)?.reseau == .youtube ? d.titre.trimmingCharacters(in: .whitespacesAndNewlines) : ""
-                let e = empreinte(compte: c, titre: titre, texte: d.texte, prevuLe: prevuLe, ia: d.ia, empreinteFichier: sha,
+                let cp = ComptePublication.trouver(c).flatMap { copies[$0.reseau] }
+                let e = empreinte(compte: c, titre: titre, texte: d.texte, prevuLe: prevuLe, ia: d.ia, empreinteFichier: cp?.sha ?? sha,
                                   empreinteCouverture: shaCouverture, couvertureMs: couvertureMs)
                 let aPoser = !couverture.isEmpty && ComptePublication.trouver(c)?.reseau == .youtube
                 try stock.base.executer("""
@@ -665,7 +728,8 @@ enum Publications {
                       empreinte_fichier, taille, ia, propose_par, valide_par, valide_le, ref, lien, conteneur, session, tentatives,
                       verifie_le, cree_le, maj_le, fait_le, couverture, empreinte_couverture, couverture_ms, couverture_etat, plugkit)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, '', '', '', '', 0, '', ?, ?, '', ?, ?, ?, ?, ?)
-                    """, [id, c, source.path, copie.path, titre, d.texte, prevuLe, validee ? "planifie" : "a_valider", e, sha, taille,
+                    """, [id, c, source.path, cp?.url.path ?? copie.path, titre, d.texte, prevuLe, validee ? "planifie" : "a_valider", e,
+                          cp?.sha ?? sha, cp?.taille ?? taille,
                           d.ia, d.par, validee ? d.par : "", validee ? m : "", m, m, couverture, shaCouverture, couvertureMs,
                           aPoser ? "a_poser" : "", plugkit])
                 ids.append(id)
@@ -677,20 +741,21 @@ enum Publications {
     /// Une publication proposée (a_valider) est validée : seulement avec l'empreinte de ce qui a été montré à Sacha.
     @discardableResult
     static func valider(_ stock: Stockage, id: String, empreinte e: String, par: String, maintenant: Date = Date()) throws -> Publication {
-        guard let p = try trouver(stock, id) else { throw RefusPublication(raisons: ["publication introuvable : \(id)"]) }
-        guard p.etat == "a_valider" else { throw RefusPublication(raisons: ["déjà « \(p.etat) » : rien à valider"]) }
+        guard let p = try trouver(stock, id) else { throw RefusPublication(raisons: [L("publication introuvable : \(id)")]) }
+        guard p.etat == "a_valider" else { throw RefusPublication(raisons: [L("déjà « \(p.etat) » : rien à valider")]) }
         guard e == p.empreinte, empreinte(p) == p.empreinte else {
-            throw RefusPublication(raisons: ["l'empreinte ne correspond pas : la publication a changé depuis ce qui a été montré, la remontrer à \(Moi.nom)"])
+            throw RefusPublication(raisons: [L("l'empreinte ne correspond pas : la publication a changé depuis ce qui a été montré, la remontrer à Sacha")])
         }
         if let d = p.prevu, d < maintenant.addingTimeInterval(avanceMin) {
-            throw RefusPublication(raisons: ["heure trop proche ou passée (\(heureParis(p.prevuLe))) : la reprogrammer"])
+            throw RefusPublication(raisons: [L("heure trop proche ou passée (\(heureAffichee(p.prevuLe))) : la reprogrammer")])
         }
         let m = Dates.iso.string(from: maintenant)
         // Venue de PlugKit : la ligne pour PILOTE (retirer le post) d'abord ; pas écrite, pas validée.
         var reveil = ""
         if !p.plugkit.isEmpty {
             do { try ecrireReveilPlugKit(stock, p, le: maintenant) } catch {
-                throw RefusPublication(raisons: ["la ligne pour PILOTE (retirer le post PlugKit \(p.plugkit)) n'a pas pu être écrite (\(error)) : rien n'est validé, réessayer"])
+                let cause = "\(error)"
+                throw RefusPublication(raisons: [L("la ligne pour PILOTE (retirer le post PlugKit \(p.plugkit)) n'a pas pu être écrite (\(cause)) : rien n'est validé, réessayer")])
             }
             reveil = m
         }
@@ -796,11 +861,48 @@ enum Publications {
         return heureParis(d)
     }
 
+    /// L'heure en français, « lun. 10/11 à 18:00 » : pour les données et les textes qui partent vers l'outil, la base, les
+    /// alertes des sessions (toujours en français). À l'écran de l'app : `heureAffichee`.
     static func heureParis(_ d: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "fr_FR")
         f.timeZone = TimeZone(identifier: "Europe/Paris")
         f.dateFormat = "EEE d/MM 'à' HH:mm"
+        return f.string(from: d)
+    }
+
+    /// L'heure prévue montrée à l'écran, dans la langue de l'app (heure de Paris, 24 h) : « lun. 10/11 à 18:00 »,
+    /// « Mon, Nov 10 at 18:00 », « lun, 10 nov, 18:00 ». En français, exactement `heureParis`.
+    static func heureAffichee(_ iso: String) -> String {
+        guard let d = Dates.iso.date(from: iso) else { return iso }
+        return heureAffichee(d)
+    }
+
+    static func heureAffichee(_ d: Date) -> String {
+        guard !Loc.estFrancais else { return heureParis(d) }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Europe/Paris")
+        f.dateFormat = "HH:mm"
+        return L("\(dateParis(d, "EEEdMMM")) à \(f.string(from: d))")
+    }
+
+    nonisolated(unsafe) private static var formatsParis: [String: DateFormatter] = [:]
+    private static let verrouFormatsParis = NSLock()
+
+    /// Une date selon un gabarit de composants (« EEEdMMM », « dMMMM »), dans la langue de l'app et à l'heure de Paris
+    /// (`Loc.date` suit le fuseau du Mac ; les publications ont l'heure de Paris).
+    static func dateParis(_ d: Date, _ gabarit: String) -> String {
+        verrouFormatsParis.lock(); defer { verrouFormatsParis.unlock() }
+        let cle = Loc.langue + "|" + gabarit
+        let f: DateFormatter
+        if let connu = formatsParis[cle] { f = connu } else {
+            f = DateFormatter()
+            f.locale = Loc.locale
+            f.timeZone = TimeZone(identifier: "Europe/Paris")
+            f.setLocalizedDateFormatFromTemplate(gabarit)
+            formatsParis[cle] = f
+        }
         return f.string(from: d)
     }
 
@@ -828,29 +930,29 @@ enum Publications {
     }
 
     static func affichage(_ p: Publication) -> String {
-        let h = heureParis(p.prevuLe)
+        let h = heureAffichee(p.prevuLe)
         switch p.etat {
-        case "a_valider": return "à valider par \(Moi.nom) (prévue \(h))"
+        case "a_valider": return L("à valider par Sacha (prévue \(h))")
         case "planifie":
             switch p.reseau {
             case .youtube:
-                return p.raison.isEmpty ? "prévue \(h) : part chez YouTube dans les 3 jours avant, la plus proche d'abord" : "prévue \(h) : \(p.raison)"
-            case .instagram: return "prévue \(h) : Pilote la publiera à l'heure (Mac allumé et éveillé)"
-            case .tiktok: return "prévue \(h) : brouillon envoyé dans la boîte TikTok 15 min avant (Mac allumé), \(Moi.nom) publie depuis l'app"
+                return p.raison.isEmpty ? L("prévue \(h) : part chez YouTube dans les 3 jours avant, la plus proche d'abord") : L("prévue \(h) : \(p.raison)")
+            case .instagram: return L("prévue \(h) : Pilote la publiera à l'heure (Mac allumé et éveillé)")
+            case .tiktok: return L("prévue \(h) : brouillon envoyé dans la boîte TikTok 15 min avant (Mac allumé), Sacha publie depuis l'app")
             }
-        case "envoi": return "envoi en cours"
+        case "envoi": return L("envoi en cours")
         case "envoye":
             switch p.reseau {
-            case .youtube: return "programmée chez YouTube pour \(h) (YouTube publie seul, Mac éteint compris)"
-            case .instagram: return "vidéo chez Instagram, publication \(h)"
+            case .youtube: return L("programmée chez YouTube pour \(h) (YouTube publie seul, Mac éteint compris)")
+            case .instagram: return L("vidéo chez Instagram, publication \(h)")
             case .tiktok:
-                return p.phase == "boite" ? "brouillon dans la boîte TikTok : à publier dans l'app (légende à coller), prévue \(h)"
-                    : "envoyée à TikTok, brouillon en préparation"
+                return p.phase == "boite" ? L("brouillon dans la boîte TikTok : à publier dans l'app (légende à coller), prévue \(h)")
+                    : L("envoyée à TikTok, brouillon en préparation")
             }
-        case "publie": return "publiée" + (p.faitLe.isEmpty ? "" : " (vu \(heureParis(p.faitLe)))")
-        case "echec": return "échec : \(p.raison)"
-        case "reconnexion": return "compte à reconnecter : \(p.raison)"
-        case "annule": return "annulée"
+        case "publie": return p.faitLe.isEmpty ? L("publiée") : L("publiée (vu \(heureAffichee(p.faitLe)))")
+        case "echec": return L("échec : \(p.raison)")
+        case "reconnexion": return L("compte à reconnecter : \(p.raison)")
+        case "annule": return L("annulée")
         default: return p.etat
         }
     }
@@ -859,16 +961,17 @@ enum Publications {
     /// Refus : introuvable, pas TikTok, pas « envoye », ou lien qui n'est pas une adresse https://www.tiktok.com/…
     @discardableResult
     static func marquerPubliee(_ stock: Stockage, id: String, lien: String = "", par: String, maintenant: Date = Date()) throws -> Publication {
-        guard let p = try trouver(stock, id) else { throw RefusPublication(raisons: ["publication introuvable : \(id)"]) }
-        guard p.reseau == .tiktok else { throw RefusPublication(raisons: ["ce n'est pas une publication TikTok : seule la passe ou l'app du réseau fait foi pour les autres"]) }
+        guard let p = try trouver(stock, id) else { throw RefusPublication(raisons: [L("publication introuvable : \(id)")]) }
+        guard p.reseau == .tiktok else { throw RefusPublication(raisons: [L("ce n'est pas une publication TikTok : seule la passe ou l'app du réseau fait foi pour les autres")]) }
         guard p.etat == "envoye" else {
-            throw RefusPublication(raisons: [p.etat == "publie" ? "déjà « publie » : rien à noter" : "pas un brouillon dans la boîte TikTok (état « \(p.etat) ») : seule une publication « envoye » peut être notée publiée"])
+            throw RefusPublication(raisons: [p.etat == "publie" ? L("déjà « publie » : rien à noter")
+                                             : L("pas un brouillon dans la boîte TikTok (état « \(p.etat) ») : seule une publication « envoye » peut être notée publiée")])
         }
         let l = lien.trimmingCharacters(in: .whitespacesAndNewlines)
         if !l.isEmpty {
             guard l.hasPrefix("https://www.tiktok.com/"), l.count > "https://www.tiktok.com/".count,
                   let u = URL(string: l), u.scheme == "https", u.host == "www.tiktok.com" else {
-                throw RefusPublication(raisons: ["le lien doit être une adresse https://www.tiktok.com/… : \(l)"])
+                throw RefusPublication(raisons: [L("le lien doit être une adresse https://www.tiktok.com/… : \(l)")])
             }
         }
         let m = Dates.iso.string(from: maintenant)
@@ -987,6 +1090,79 @@ enum Publications {
                 throw RefusPublication(raisons: ["la publication a changé depuis sa validation (titre, texte ou heure) : rien n'est parti"])
             }
             return u
+        }
+
+        /// Instagram, dès la validation (10/11) : la vidéo est envoyée chez Instagram et traitée jusqu'à FINISHED, sans
+        /// media_publish (rien de public). Un refus se sait des heures avant l'heure, avec une alerte. Réussi : le conteneur
+        /// est gardé s'il vit jusqu'à l'heure (24 h chez Instagram), sinon l'envoi définitif se refait 20 min avant.
+        /// Un essai par passe au plus, et aucun si une autre publication arrive dans les 35 min (l'essai tient la passe
+        /// jusqu'à 15 min, tunnel compris).
+        var essaiIGFait = false
+        func essaiInstagram(_ p: Publication, _ prevu: Date, _ t: Date) throws {
+            guard p.verifieLe.isEmpty else { return }
+            func reussi(_ conteneur: String, _ t2: Date) throws {
+                let m = Dates.iso.string(from: t2)
+                if prevu.addingTimeInterval(retardMax).timeIntervalSince(t2) < dureeConteneurIG {
+                    try noter(stock, p.id, ["etat": "envoye", "phase": "", "conteneur": conteneur, "tentatives": 0, "verifie_le": m,
+                                            "raison": "essai Instagram réussi : vidéo prête chez Instagram (rien de public), publication à l'heure"], le: t2)
+                } else {
+                    try noter(stock, p.id, ["etat": "planifie", "phase": "", "conteneur": "", "tentatives": 0, "verifie_le": m,
+                                            "raison": "essai Instagram réussi (rien de public) : envoi définitif 20 min avant l'heure"], le: t2)
+                }
+                bilan.envoyees.append(p.id)
+            }
+            /// Trop d'essais ratés pour une raison passagère : pas d'échec (la vidéo n'est pas en cause), alerte, et l'envoi
+            /// se refait 20 min avant l'heure comme avant.
+            func abandon(_ m: String, _ t2: Date) throws {
+                try noter(stock, p.id, ["etat": "planifie", "phase": "", "conteneur": "", "tentatives": 0, "verifie_le": Dates.iso.string(from: t2),
+                                        "raison": "essai Instagram impossible (\(m)) : nouvel envoi 20 min avant l'heure"], le: t2)
+                alerter(AlertePublication(id: "publication-\(p.id.prefix(8))-essai", le: Dates.iso.string(from: t2),
+                                          titre: "Pilote · essai Instagram impossible",
+                                          texte: "\(ComptePublication.trouver(p.compte)?.nom ?? p.compte), prévue \(heureParis(p.prevuLe)) (« \(apercu(p)) ») : \(tentativesMax) essais ratés (\(m)). Nouvel envoi 20 min avant l'heure.",
+                                          grave: true))
+            }
+            func rate(_ e: Error, _ t2: Date) throws {
+                let q = try trouver(stock, p.id) ?? p
+                if case ErreurPlateforme.passagere(let m) = e, q.tentatives + 1 >= tentativesMax { try abandon(m, t2); return }
+                try noter(stock, p.id, ["conteneur": ""], le: t2)
+                try traiter(e, q, t2, retour: "planifie")
+            }
+            // Un essai déjà chez Instagram (envoi direct : le traitement continue après l'envoi) : relu.
+            if !p.conteneur.isEmpty {
+                do {
+                    let c = try plateformes.instagramConteneur(compte: p.compte, conteneur: p.conteneur)
+                    switch c.code {
+                    case "FINISHED": try reussi(p.conteneur, t)
+                    case "EXPIRED": try noter(stock, p.id, ["conteneur": ""], le: t)
+                    case "IN_PROGRESS", "":
+                        if let m = Dates.iso.date(from: p.majLe), t.timeIntervalSince(m) > 30 * 60 {
+                            try rate(ErreurPlateforme.passagere("Instagram traite encore la vidéo après 30 min"), t)
+                        }
+                    default:
+                        try noter(stock, p.id, ["conteneur": ""], le: t)
+                        try echec(p, "Instagram a refusé la vidéo à l'essai (\(c.code)\(c.detail.isEmpty ? "" : " : " + c.detail))", t)
+                    }
+                } catch { try rate(error, t) }
+                return
+            }
+            guard !essaiIGFait else { return }
+            guard try stock.base.lignes("""
+                SELECT id FROM publications WHERE etat IN ('planifie', 'envoye', 'envoi') AND id <> ? AND prevu_le >= ? AND prevu_le <= ? LIMIT 1
+                """, [p.id, Dates.iso.string(from: t), Dates.iso.string(from: t.addingTimeInterval(35 * 60))]).isEmpty else { return }
+            essaiIGFait = true
+            do {
+                let u = try fichierValide(p)
+                try noter(stock, p.id, ["etat": "envoi", "phase": "essai"], le: t)
+                let c = try plateformes.instagramPreparer(p, fichier: u)
+                let t2 = maintenant()
+                let s = (try? plateformes.instagramConteneur(compte: p.compte, conteneur: c))?.code ?? ""
+                if s == "FINISHED" {
+                    try reussi(c, t2)
+                } else {
+                    try noter(stock, p.id, ["etat": "planifie", "phase": "", "conteneur": c,
+                                            "raison": "essai Instagram en cours (rien de public) : vidéo reçue, Instagram la traite"], le: t2)
+                }
+            } catch { try rate(error, maintenant()) }
         }
 
         /// YouTube : la miniature validée, posée une fois la vidéo traitée. Jamais d'échec ni de reconnexion pour elle :
@@ -1178,7 +1354,10 @@ enum Publications {
                 } catch { try traiter(error, p, t, retour: "envoye") }
 
             case (.instagram, "planifie"):
-                guard t >= prevu.addingTimeInterval(-preparationIG) else { continue }
+                guard t >= prevu.addingTimeInterval(-preparationIG) else {
+                    try essaiInstagram(p, prevu, t)
+                    continue
+                }
                 if t > prevu.addingTimeInterval(retardMax) {
                     try echec(p, "pas publiée : \(Int(t.timeIntervalSince(prevu) / 60)) min de retard à l'heure prévue (Mac éteint ou en veille ?) ; à reprogrammer", t)
                     continue
@@ -1218,6 +1397,9 @@ enum Publications {
                         bilan.publiees.append(p.id)
                     case "IN_PROGRESS", "":
                         try noter(stock, p.id, ["raison": "Instagram traite encore la vidéo : publication dès qu'elle est prête"], le: t)
+                    case "EXPIRED":
+                        // Conteneur périmé (plus de 24 h) : envoi refait tout de suite, toujours sans rien publier avant l'heure.
+                        try noter(stock, p.id, ["etat": "planifie", "phase": "", "conteneur": "", "raison": "conteneur Instagram périmé : vidéo renvoyée"], le: t)
                     default:
                         try echec(p, "Instagram a refusé la vidéo (\(c.code)\(c.detail.isEmpty ? "" : " : " + c.detail))", t)
                     }

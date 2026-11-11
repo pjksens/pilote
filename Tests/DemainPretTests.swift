@@ -2,6 +2,10 @@
 import XCTest
 
 final class DemainPretTests: XCTestCase {
+    /// Les jours (« lun. 9 ») suivent la langue de l'app (Loc.date) : ces tests attendent le français, que le test ne reçoit pas
+    /// de lui-même (sous xctest, la langue de départ est celle du bundle, pas toujours le français).
+    override func setUp() { Loc.langue = "fr" }
+
     private func video(_ jour: String, _ compte: String, _ statut: String, _ sujet: String = "Sujet") -> Video {
         Video(id: UUID().uuidString, jour: jour, compte: compte, sujet: sujet, statut: statut)
     }

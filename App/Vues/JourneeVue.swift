@@ -38,9 +38,9 @@ struct CarteJournee: View {
         let prevus = tout.filter { $0.genre != .cadre && !$0.fait }.count
         let faits = tout.filter(\.fait).count
         let e = montrerFaits ? tout : tout.filter { !$0.fait }
-        Carte(titre: "Ma journée", detail: "\(DemainPret.libelleJour(Dates.aujourdhui())) · "
-              + (prevus == 0 ? "rien à faire en dehors du cadre" : (prevus == 1 ? "1 chose à faire" : "\(prevus) choses à faire"))
-              + (faits == 0 ? "" : " · \(faits) faite\(faits > 1 ? "s" : "")")) {
+        Carte(titre: L("Ma journée"), detail: "\(DemainPret.libelleJour(Dates.aujourdhui())) · "
+              + (prevus == 0 ? L("rien à faire en dehors du cadre") : L("\(prevus) choses à faire"))
+              + (faits == 0 ? "" : " · " + L("\(faits) faites"))) {
             if faits > 0 {
                 HStack {
                     Spacer()
@@ -89,7 +89,7 @@ struct CarteJournee: View {
             Spacer(minLength: 8)
             if agir && !el.fait {
                 Menu {
-                    ForEach(Report.allCases) { r in Button(r.rawValue) { reporter(el, jour: r.jour(depuis: Date())) } }
+                    ForEach(Report.allCases) { r in Button(r.libelle) { reporter(el, jour: r.jour(depuis: Date())) } }
                     Divider()
                     Button("Date précise…") { date = debut(el).map { Report.memeHeure($0, le: Report.demain.jour(depuis: Date())) } ?? Date(); aReporter = el }
                 } label: { Label("Reporter", systemImage: "calendar.badge.clock") }
@@ -173,8 +173,8 @@ struct CarteSeanceDimanche: View {
         let aujourdhui = Dates.aujourdhui()
         let c = SeanceDimanche.creneaux(etat.videos, aujourdhui: aujourdhui)
         let faits = c.filter(\.choisi).count
-        Carte(titre: "Séance du dimanche", detail: "semaine du \(DemainPret.libelleJour(SeanceDimanche.semaine(aujourdhui).first ?? aujourdhui))"
-              + " · \(faits) sur \(c.count) choisis") {
+        Carte(titre: L("Séance du dimanche"),
+              detail: L("semaine du \(DemainPret.libelleJour(SeanceDimanche.semaine(aujourdhui).first ?? aujourdhui)) · \(faits) sur \(c.count) choisis")) {
             ForEach(Array(c.enumerated()), id: \.element.id) { i, creneau in
                 LigneCarte(dernier: i == c.count - 1) { LigneSeance(creneau: creneau) }
             }
@@ -197,14 +197,14 @@ private struct CarteIdees: View {
     var body: some View {
         let toutes = SeanceDimanche.idees((try? String(contentsOfFile: fichier, encoding: .utf8)) ?? "")
         let reste = toutes.filter { !traitees.contains($0.ref) }
-        Carte(titre: "Boîte à idées", detail: reste.isEmpty ? "rien à trier" : (reste.count == 1 ? "1 idée à trier" : "\(reste.count) idées à trier")) {
+        Carte(titre: L("Boîte à idées"), detail: reste.isEmpty ? L("rien à trier") : L("\(reste.count) idées à trier")) {
             ForEach(Array(reste.enumerated()), id: \.element.ref) { i, idee in
                 LigneCarte(dernier: i == reste.count - 1 && erreur == nil) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(idee.texte).font(.secondaire).foregroundStyle(Color.texte).lineLimit(4).textSelection(.enabled)
                         HStack(spacing: 8) {
                             ForEach(SeanceDimanche.choixIdee, id: \.self) { c in
-                                Button(c) { trier(idee, c) }
+                                Button(SeanceDimanche.libelleChoixIdee(c)) { trier(idee, c) }
                             }
                         }
                         .buttonStyle(.bordered).controlSize(.small)
@@ -224,7 +224,7 @@ private struct CarteIdees: View {
             try Decisions.noter(question: "Idée : \(idee.texte)", choix: choix, ref: idee.ref, liste: "KRYVA", pour: "PILOTE")
             traitees.insert(idee.ref)
             erreur = nil
-        } catch { erreur = "Pas noté : \(error.localizedDescription)" }
+        } catch { erreur = L("Pas noté : \(error.localizedDescription)") }
         etat.relireDecisions()
     }
 }
@@ -243,7 +243,7 @@ private struct LigneSeance: View {
                     .foregroundStyle(creneau.choisi ? Color.vert : Color.ambre)
                 Text(creneau.libelle).font(.ligne.weight(.semibold)).foregroundStyle(Color.texte)
                 if creneau.choisi, let v = creneau.video {
-                    Text(v.statut == "annulee" ? "Pas de vidéo" : v.sujet).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(2)
+                    Text(v.statut == "annulee" ? L("Pas de vidéo") : v.sujet).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(2)
                 } else if creneau.options.isEmpty {
                     Text("Pas encore de proposition de Réseaux").font(.secondaire).foregroundStyle(Color.texte3)
                 }
@@ -289,7 +289,7 @@ private struct LigneSeance: View {
         do {
             try Decisions.noter(question: SeanceDimanche.question(creneau), choix: sujet, ref: "seance:\(creneau.id)", liste: "Contenu")
             erreur = nil
-        } catch { erreur = "Validé dans Pilote, mais pas noté pour Réseaux : \(error.localizedDescription)" }
+        } catch { erreur = L("Validé dans Pilote, mais pas noté pour Réseaux : \(error.localizedDescription)") }
         etat.relireDecisions()
     }
 }

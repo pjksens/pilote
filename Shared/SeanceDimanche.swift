@@ -46,22 +46,28 @@ enum SeanceDimanche {
     /// Les 5 jours de la semaine qui vient (du samedi ou du dimanche, c'est la semaine du lundi suivant).
     static func semaine(_ aujourdhui: String) -> [String] { VideoCalcul.semaine(de: VideoCalcul.lendemainOuvre(aujourdhui)) }
 
+    /// « lun. 9 nov. · KRYVA », « Réserve · Perso » (jour vide), dans la langue de l'app.
+    static func libelleCreneau(jour: String, compte: String) -> String {
+        let nom = VideoVocabulaire.compte(compte)
+        return jour.isEmpty ? L("Réserve · \(nom)") : "\(DemainPret.libelleJour(jour)) · \(nom)"
+    }
+
     /// Les 10 créneaux de la semaine, puis 1 sujet de réserve par compte.
     static func creneaux(_ videos: [Video], aujourdhui: String) -> [CreneauSeance] {
         var c: [CreneauSeance] = []
         for j in semaine(aujourdhui) {
-            for (compte, libelle) in VideoVocabulaire.comptes {
+            for (compte, _) in VideoVocabulaire.comptes {
                 let v = videos.first { $0.jour == j && $0.compte == compte }
-                c.append(CreneauSeance(id: "\(j)-\(compte)", jour: j, compte: compte, libelle: "\(DemainPret.libelleJour(j)) · \(libelle)",
+                c.append(CreneauSeance(id: "\(j)-\(compte)", jour: j, compte: compte, libelle: libelleCreneau(jour: j, compte: compte),
                                        video: v, options: v.map { Decisions.options($0.notes) } ?? []))
             }
         }
-        for (compte, libelle) in VideoVocabulaire.comptes {
+        for (compte, _) in VideoVocabulaire.comptes {
             let reserve = videos.filter { $0.jour.isEmpty && $0.compte == compte }
             // Une réserve validée suffit ; sinon la proposition de Réseaux, s'il y en a une.
             let v = reserve.first { !$0.sujet.isEmpty && ["valide", "tournee", "prete"].contains($0.statut) }
                 ?? reserve.first { $0.statut == "a_choisir" }
-            c.append(CreneauSeance(id: "reserve-\(compte)", jour: "", compte: compte, libelle: "Réserve · \(libelle)",
+            c.append(CreneauSeance(id: "reserve-\(compte)", jour: "", compte: compte, libelle: libelleCreneau(jour: "", compte: compte),
                                    video: v, options: v.map { Decisions.options($0.notes) } ?? []))
         }
         return c
@@ -79,7 +85,18 @@ enum SeanceDimanche {
 
     // MARK: La boîte à idées (IDEES.md, « revue le dimanche avec les sujets »)
 
+    /// Les réponses possibles, telles qu'elles partent à PILOTE (en français : valeurs de la base, jamais traduites).
     static let choixIdee = ["À faire cette semaine", "Au parking (relu le samedi)", "Non"]
+
+    /// Le même choix, écrit pour l'écran dans la langue de l'app.
+    static func libelleChoixIdee(_ choix: String) -> String {
+        switch choix {
+        case "À faire cette semaine": return L("À faire cette semaine")
+        case "Au parking (relu le samedi)": return L("Au parking (relu le samedi)")
+        case "Non": return L("Non")
+        default: return choix
+        }
+    }
 
     /// Les idées de IDEES.md : une ligne « - … » chacune ; la ref ne change pas tant que la ligne ne change pas.
     static func idees(_ texte: String) -> [(ref: String, texte: String)] {
@@ -98,6 +115,8 @@ enum SeanceDimanche {
         return String(h, radix: 16)
     }
 
-    /// La question telle qu'elle part à Réseaux avec la réponse.
-    static func question(_ c: CreneauSeance) -> String { "Séance du dimanche, sujet de la vidéo \(c.libelle)" }
+    /// La question telle qu'elle part à Réseaux avec la réponse (écrite en base : toujours en français).
+    static func question(_ c: CreneauSeance) -> String {
+        DemainPret.enFrancais { "Séance du dimanche, sujet de la vidéo \(libelleCreneau(jour: c.jour, compte: c.compte))" }
+    }
 }

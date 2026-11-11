@@ -367,7 +367,7 @@ enum PublicationCommande {
     static func essaiInstagram(_ stock: Stockage, _ args: [String]) throws {
         guard let id = option("--compte", args), let c = ComptePublication.trouver(id), c.reseau == .instagram,
               let f = option("--fichier", args) else {
-            echouer("pilote publication essai-instagram --compte ig-perso|ig-kryva --fichier VIDEO")
+            echouer("pilote publication essai-instagram --compte ig-perso|ig-kryva --fichier VIDEO [--par-tunnel|--direct]")
         }
         let u = URL(fileURLWithPath: (f as NSString).expandingTildeInPath)
         let p = Publication(id: "essai", compte: c.id, source: u.path, fichier: u.path, titre: "", texte: "Essai Pilote (jamais publié)",
@@ -376,12 +376,29 @@ enum PublicationCommande {
                             lien: "", conteneur: "", session: "", tentatives: 0, verifieLe: "", creeLe: "", majLe: "", faitLe: "")
         let r = PlateformesReelles()
         var etapes: [String] = []
-        let conteneur = try r.instagramPreparer(p, fichier: u)
-        etapes.append("conteneur créé et vidéo envoyée depuis le Mac : \(conteneur)")
+        // Sans option : la voie de la passe (envoi direct, ou lien temporaire si la vidéo est trop longue, voir instagramPreparer).
+        // --par-tunnel : force le lien temporaire. --direct : force l'envoi direct.
+        let conteneur: String
+        do {
+            if args.contains("--par-tunnel") {
+                conteneur = try r.instagramPreparerParTunnel(p, fichier: u) { etapes.append($0) }
+            } else if args.contains("--direct") {
+                conteneur = try r.instagramPreparerDirect(p, fichier: u)
+                etapes.append("conteneur créé et vidéo envoyée depuis le Mac : \(conteneur)")
+            } else {
+                conteneur = try r.instagramPreparer(p, fichier: u)
+                etapes.append("conteneur prêt (voie de la passe) : \(conteneur)")
+            }
+        } catch {
+            etapes.append("échec : \(error)")
+            etapes.append("media_publish PAS appelé (rien de public)")
+            sortir(EssaiInstagram(compte: c.id, conteneur: "", statut: "ECHEC", detail: "\(error)", etapes: etapes))
+            return
+        }
         var etat = ConteneurInstagram(code: "", detail: "")
         let limite = Date().addingTimeInterval(300)
         repeat {
-            Thread.sleep(forTimeInterval: 10)
+            Thread.sleep(forTimeInterval: 5)
             etat = try r.instagramConteneur(compte: c.id, conteneur: conteneur)
         } while (etat.code == "IN_PROGRESS" || etat.code.isEmpty) && Date() < limite
         etapes.append("statut : \(etat.code) \(etat.detail)")

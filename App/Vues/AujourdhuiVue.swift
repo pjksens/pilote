@@ -37,10 +37,7 @@ struct AujourdhuiVue: View {
     private var actualisationEnCours: Bool { etat.etatMails == .enCours || etat.etatCompteur == .enCours || etat.etatInscrits == .enCours }
 
     private var dateDuJour: String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateFormat = "EEEE d MMMM"
-        let s = f.string(from: Date())
+        let s = Loc.date(Date(), "EEEEdMMMM")
         return s.prefix(1).uppercased() + s.dropFirst()
     }
 
@@ -78,10 +75,10 @@ struct AujourdhuiVue: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                EnTete(titre: "Aujourd'hui", detail: dateDuJour)
+                EnTete(titre: L("Aujourd'hui"), detail: dateDuJour)
                 if !etat.arrets.isEmpty { bandeauArrets }
                 if let e = etat.erreurSynchro {
-                    Carte(titre: "Synchro KRYVA") { EtatErreur(texte: "Synchro avec l'admin KRYVA : \(e)") }
+                    Carte(titre: L("Synchro KRYVA")) { EtatErreur(texte: L("Synchro avec l'admin KRYVA : \(e)")) }
                 }
                 TimelineView(.everyMinute) { contexte in bandeauRendezVous(a: contexte.date) }
                 // « Demain prêt ? » : en haut le soir (dès 17 h) et le week-end, sous « À décider » le reste du temps.
@@ -151,7 +148,7 @@ struct AujourdhuiVue: View {
     private func bandeauRendezVous(a maintenant: Date) -> some View {
         let restants = agenda.restants(a: maintenant)
         if agenda.accesCalendrier == .accorde, !restants.isEmpty {
-            Carte(titre: "Rendez-vous", detail: "\(restants.count)") {
+            Carte(titre: L("Rendez-vous"), detail: "\(restants.count)") {
                 ForEach(Array(restants.enumerated()), id: \.element.id) { i, rv in
                     LigneCarte(dernier: i == restants.count - 1) { LigneRendezVous(rv: rv) }
                 }
@@ -162,28 +159,28 @@ struct AujourdhuiVue: View {
     // MARK: Vidéos
 
     private var blocPublier: some View {
-        Carte(titre: "À publier aujourd'hui") {
+        Carte(titre: L("À publier aujourd'hui")) {
             if VideoCalcul.estOuvre(aujourdhui) {
                 HStack(spacing: 10) {
                     ForEach(VideoVocabulaire.comptes, id: \.0) { TuileVideo(jour: aujourdhui, compte: $0.0) }
                 }
                 .padding(.horizontal, 12).padding(.bottom, 12)
             } else {
-                EtatVide(texte: "Rien le week-end.")
+                EtatVide(texte: L("Rien le week-end."))
             }
         }
         .frame(maxWidth: .infinity)
     }
 
     private var blocTourner: some View {
-        Carte(titre: "À tourner aujourd'hui", detail: jourATourner.map { "pour \(Dates.court($0))" }) {
+        Carte(titre: L("À tourner aujourd'hui"), detail: jourATourner.map { L("pour \(Dates.court($0))") }) {
             if let jour = jourATourner {
                 HStack(spacing: 10) {
                     ForEach(VideoVocabulaire.comptes, id: \.0) { TuileVideo(jour: jour, compte: $0.0) }
                 }
                 .padding(.horizontal, 12).padding(.bottom, 12)
             } else {
-                EtatVide(texte: "Rien à tourner le week-end. Les vidéos de lundi se tournent vendredi.")
+                EtatVide(texte: L("Rien à tourner le week-end. Les vidéos de lundi se tournent vendredi."))
             }
         }
         .frame(maxWidth: .infinity)
@@ -194,9 +191,9 @@ struct AujourdhuiVue: View {
     private var blocProspects: some View {
         let tous = prospects
         let montres = Array(tous.prefix(5))
-        return Carte(titre: "Prospects du jour", detail: tous.isEmpty ? nil : "\(montres.count) sur \(tous.count) en attente") {
+        return Carte(titre: L("Prospects du jour"), detail: tous.isEmpty ? nil : L("\(montres.count) sur \(tous.count) en attente")) {
             if tous.isEmpty {
-                EtatVide(texte: "Personne à relancer aujourd'hui.")
+                EtatVide(texte: L("Personne à relancer aujourd'hui."))
                 lignePlusTard
             } else {
                 ForEach(Array(montres.enumerated()), id: \.element.id) { i, p in
@@ -223,7 +220,7 @@ struct AujourdhuiVue: View {
         let plusTard = etat.aEnvoyerPlusTard
         if !plusTard.isEmpty {
             let jours = Dictionary(grouping: plusTard, by: \.jour).sorted { $0.key < $1.key }
-                .map { "\($0.value.count) \($0.key == Dates.dans(1) ? "demain" : "le " + Dates.court($0.key))" }
+                .map { $0.key == Dates.dans(1) ? L("\($0.value.count) demain") : L("\($0.value.count) le \(Dates.court($0.key))") }
             Button { withAnimation(.snappy) { plusTardOuvert.toggle() } } label: {
                 Label("Prêts pour plus tard, ils s'afficheront le jour venu : \(jours.joined(separator: ", "))",
                       systemImage: plusTardOuvert ? "chevron.down" : "chevron.right")
@@ -241,16 +238,17 @@ struct AujourdhuiVue: View {
     private var blocValider: some View {
         let liste = etat.aValider
         let auteurs = Set(liste.map { Etat.auteur($0.contact) }).sorted().joined(separator: ", ")
-        return Carte(titre: "Textes à valider", detail: liste.isEmpty ? nil : "\(liste.count) · écrits par \(auteurs)") {
+        return Carte(titre: L("Textes à valider"), detail: liste.isEmpty ? nil : L("\(liste.count) · écrits par \(auteurs)")) {
             if liste.isEmpty {
-                EtatVide(texte: "Rien à valider.")
+                EtatVide(texte: L("Rien à valider."))
             }
             ForEach(Array(liste.enumerated()), id: \.element.id) { i, m in
                 LigneCarte(dernier: i == liste.count - 1 && etat.aRefaire.isEmpty) { CarteTexte(message: m) }
             }
             if !etat.aRefaire.isEmpty {
                 let n = etat.aRefaire.count
-                Label("\(n) texte\(n > 1 ? "s" : "") renvoyé\(n > 1 ? "s" : "") avec votre consigne : il\(n > 1 ? "s reviendront" : " reviendra") ici une fois réécrit\(n > 1 ? "s" : "").",
+                Label(n > 1 ? L("\(n) textes renvoyés avec votre consigne : ils reviendront ici une fois réécrits.")
+                          : L("1 texte renvoyé avec votre consigne : il reviendra ici une fois réécrit."),
                       systemImage: "arrow.uturn.backward")
                     .font(.secondaire).foregroundStyle(Color.texte2)
                     .padding(.horizontal, 16).padding(.vertical, 10)
@@ -264,7 +262,7 @@ struct AujourdhuiVue: View {
         let toutes = decisions
         let montrees = toutesDecisions ? toutes : Array(toutes.prefix(3))
         let questions = etat.questionsSessions
-        return Carte(titre: "À décider", detail: toutes.count > 3 ? "\(montrees.count) sur \(toutes.count)" : nil) {
+        return Carte(titre: L("À décider"), detail: toutes.count > 3 ? L("\(montrees.count) sur \(toutes.count)") : nil) {
             // Les questions des sessions d'abord : une session attend la réponse pour continuer.
             ForEach(Array(questions.enumerated()), id: \.element.id) { i, a in
                 LigneCarte(dernier: i == questions.count - 1 && montrees.isEmpty) {
@@ -273,20 +271,20 @@ struct AujourdhuiVue: View {
             }
             switch agenda.accesRappels {
             case .refuse:
-                EtatErreur(texte: "Pilote n'a pas accès à Rappels. Réglages Système › Confidentialité › Rappels.")
+                EtatErreur(texte: L("Pilote n'a pas accès à Rappels. Réglages Système › Confidentialité › Rappels."))
             case .coupe:
-                if montrees.isEmpty && questions.isEmpty { EtatVide(texte: "Rappels coupés : à activer dans reglages.json (rappels_calendrier).") }
+                if montrees.isEmpty && questions.isEmpty { EtatVide(texte: L("Rappels coupés : à activer dans reglages.json (rappels_calendrier).")) }
             case .inconnu:
-                EtatChargement(texte: "Lecture de vos rappels…")
+                EtatChargement(texte: L("Lecture de vos rappels…"))
             case .accorde:
                 if montrees.isEmpty {
-                    if questions.isEmpty { EtatVide(texte: "Aucune décision en attente.") }
+                    if questions.isEmpty { EtatVide(texte: L("Aucune décision en attente.")) }
                 } else {
                     ForEach(Array(montrees.enumerated()), id: \.element.id) { i, r in
                         LigneCarte(dernier: i == montrees.count - 1 && toutes.count <= 3) { CarteDecision(rappel: r) }
                     }
                     if toutes.count > 3 {
-                        Button(toutesDecisions ? "Replier" : (toutes.count == 4 ? "Voir l'autre décision" : "Voir les \(toutes.count - 3) autres décisions")) {
+                        Button(toutesDecisions ? L("Replier") : (toutes.count == 4 ? L("Voir l'autre décision") : L("Voir les \(toutes.count - 3) autres décisions"))) {
                             withAnimation(.snappy) { toutesDecisions.toggle() }
                         }
                         .buttonStyle(.link).font(.secondaire).padding(.top, 8)
@@ -302,7 +300,7 @@ struct AujourdhuiVue: View {
     private var blocRappels: some View {
         let tous = autresRappels
         let montres = Array(tous.prefix(3))
-        return Carte(titre: "Autres rappels du jour", detail: tous.count > 3 ? "3 sur \(tous.count)" : "\(tous.count)") {
+        return Carte(titre: L("Autres rappels du jour"), detail: tous.count > 3 ? L("3 sur \(tous.count)") : "\(tous.count)") {
             ForEach(Array(montres.enumerated()), id: \.element.id) { i, r in
                 LigneCarte(dernier: i == montres.count - 1 && tous.count <= 3) { LigneRappel(rappel: r) }
             }
@@ -317,15 +315,15 @@ struct AujourdhuiVue: View {
     // MARK: Le reste (replié)
 
     private var carteMails: some View {
-        Carte(titre: "Mails de vos contacts", detail: "3 derniers jours") {
+        Carte(titre: L("Mails de vos contacts"), detail: L("3 derniers jours")) {
             switch etatMails {
             case .attente, .enCours:
-                EtatChargement(texte: "Recherche des mails de vos contacts…")
+                EtatChargement(texte: L("Recherche des mails de vos contacts…"))
             case .erreur(let e):
                 EtatErreur(texte: e) { Task { await etat.chargerMails(force: true) } }
             case .pret:
                 if mails.isEmpty {
-                    EtatVide(texte: "Aucun mail de vos contacts ces 3 derniers jours.")
+                    EtatVide(texte: L("Aucun mail de vos contacts ces 3 derniers jours."))
                 } else {
                     ForEach(Array(mails.enumerated()), id: \.element.id) { i, m in
                         LigneCarte(dernier: i == mails.count - 1) {
@@ -340,11 +338,11 @@ struct AujourdhuiVue: View {
     // MARK: En chiffres (module comptes, commande du compteur)
 
     private var carteChiffres: some View {
-        Carte(titre: "En chiffres", detail: "objectif : \(compteur?.objectif ?? 0) actifs") {
+        Carte(titre: L("En chiffres"), detail: L("objectif : \(compteur?.objectif ?? 0) actifs")) {
             if let c = compteur {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(c.actifs)").font(.system(size: 34, weight: .bold).monospacedDigit()).foregroundStyle(Color.texte)
-                    Text("\(c.actifs > 1 ? "actifs" : "actif") sur \(c.objectif)").font(.titreSection).foregroundStyle(Color.texte2)
+                    Text(c.actifs > 1 ? L("actifs sur \(c.objectif)") : L("actif sur \(c.objectif)")).font(.titreSection).foregroundStyle(Color.texte2)
                     Spacer()
                     Text("\(inscrits.count) inscrits en 14 jours").font(.secondaire).foregroundStyle(Color.texte2)
                 }
@@ -373,7 +371,7 @@ struct AujourdhuiVue: View {
             } else {
                 switch etatCompteur {
                 case .erreur(let e): EtatErreur(texte: e) { Task { await etat.chargerCompteur(force: true) } }
-                default: EtatChargement(texte: "Calcul du compteur…")
+                default: EtatChargement(texte: L("Calcul du compteur…"))
                 }
             }
         }
@@ -382,15 +380,15 @@ struct AujourdhuiVue: View {
     // MARK: Inscrits à accompagner
 
     private var carteInscrits: some View {
-        Carte(titre: "Inscrits à accompagner", detail: "14 derniers jours") {
+        Carte(titre: L("Inscrits à accompagner"), detail: L("14 derniers jours")) {
             switch etatInscrits {
             case .attente where inscrits.isEmpty, .enCours where inscrits.isEmpty:
-                EtatChargement(texte: "Lecture de la base des comptes…")
+                EtatChargement(texte: L("Lecture de la base des comptes…"))
             case .erreur(let e):
                 EtatErreur(texte: e) { Task { await etat.chargerInscrits(force: true) } }
             default:
                 if inscrits.isEmpty {
-                    EtatVide(texte: "Aucune inscription ces 14 derniers jours.")
+                    EtatVide(texte: L("Aucune inscription ces 14 derniers jours."))
                 } else {
                     ForEach(Array(inscrits.enumerated()), id: \.element.id) { i, ins in
                         LigneCarte(dernier: i == inscrits.count - 1) { LigneInscrit(inscrit: ins) }
@@ -425,20 +423,20 @@ struct LigneSuiviDuJour: View {
                     Text(contact.titre).font(.ligneForte).foregroundStyle(Color.texte)
                     if !contact.sousTitre.isEmpty { Text(contact.sousTitre).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1) }
                 }
-                Text(contact.prochaineAction.isEmpty ? "Prochaine action à préciser" : contact.prochaineAction)
+                Text(contact.prochaineAction.isEmpty ? L("Prochaine action à préciser") : contact.prochaineAction)
                     .font(.ligne).foregroundStyle(Color.texte).lineLimit(2)
-                Text(echange?.resume ?? "Aucun échange noté")
+                Text(echange?.resumeAffiche ?? L("Aucun échange noté"))
                     .font(.petit).foregroundStyle(Color.texte3)
                 ParcoursContact(contact: contact, compact: true).padding(.top, 2)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 6) {
-                Text(contact.prochaineDate < Dates.aujourdhui() ? "Prévu le \(Dates.court(contact.prochaineDate))" : "Aujourd'hui")
+                Text(contact.prochaineDate < Dates.aujourdhui() ? L("Prévu le \(Dates.court(contact.prochaineDate))") : L("Aujourd'hui"))
                     .font(.secondaire).foregroundStyle(contact.prochaineDate < Dates.aujourdhui() ? Color.rouge : Color.texte2)
                 HStack(spacing: 6) {
                     Button("Fiche") { etat.ouvrir(contact) }
                     Menu {
-                        ForEach(Report.allCases) { r in Button(r.rawValue) { etat.reporterAction(contact, au: r.jour(depuis: Date())) } }
+                        ForEach(Report.allCases) { r in Button(r.libelle) { etat.reporterAction(contact, au: r.jour(depuis: Date())) } }
                         Divider()
                         Button("Date précise…") { date = Report.demain.jour(depuis: Date()); choisirDate = true }
                         Button("Pas fait : noter la raison…") { feuillePasFait = true }
@@ -568,7 +566,7 @@ struct CarteDecision: View {
             try Decisions.noter(question: Decisions.question(rappel.titre), choix: o, ref: rappel.id, liste: rappel.liste,
                                 pour: Decisions.pour(liste: rappel.liste, notes: rappel.notes))
         } catch {
-            erreur = "Le choix n'a pas pu être transmis : \(error.localizedDescription)"
+            erreur = L("Le choix n'a pas pu être transmis : \(error.localizedDescription)")
             choisi = nil
             return
         }
@@ -645,12 +643,11 @@ struct CarteQuestionSession: View {
     private var origine: (String, String)? {
         switch activite.questionGenre {
         case "dialogue":
-            return ("Aussi en dialogue dans l'app Claude : la session y attend",
-                    "Question posée avec AskUserQuestion. Le plus sûr : répondre dans la session (Ouvrir). "
-                    + "Une réponse d'ici lui part aussi ; qu'elle ferme le dialogue n'est pas vérifié.")
+            return (L("Aussi en dialogue dans l'app Claude : la session y attend"),
+                    L("Question posée avec AskUserQuestion. Le plus sûr : répondre dans la session (Ouvrir). Une réponse d'ici lui part aussi ; qu'elle ferme le dialogue n'est pas vérifié."))
         case "texte":
-            return ("Repérée dans son texte (sans bouton de fin de tour)",
-                    "La session a écrit cette question sans la mettre dans sa fin de tour : Pilote l'a repérée quand même.")
+            return (L("Repérée dans son texte (sans bouton de fin de tour)"),
+                    L("La session a écrit cette question sans la mettre dans sa fin de tour : Pilote l'a repérée quand même."))
         default: return nil
         }
     }
@@ -667,7 +664,7 @@ struct CarteQuestionSession: View {
             try Decisions.noter(question: activite.question, choix: o, ref: activite.questionRef, liste: "Sessions",
                                 pour: nom, session: activite.sessionApp)
         } catch {
-            erreur = "Pas noté : \(error.localizedDescription)"
+            erreur = L("Pas noté : \(error.localizedDescription)")
             choisi = nil
             return
         }
@@ -690,7 +687,7 @@ struct DecisionsEnvoyees: View {
                         Text("Vos réponses, prêtes à partir").font(.petit.weight(.semibold)).foregroundStyle(Color.texte2)
                         Spacer()
                         Button { etat.envoyerReponses(attente.map(\.id)) } label: {
-                            Label(attente.count == 1 ? "Envoyer" : "Tout envoyer (\(attente.count))", systemImage: "paperplane.fill")
+                            Label(attente.count == 1 ? L("Envoyer") : L("Tout envoyer (\(attente.count))"), systemImage: "paperplane.fill")
                         }
                         .buttonStyle(.borderedProminent).tint(.action).controlSize(.small)
                     }
@@ -713,7 +710,7 @@ struct DecisionsEnvoyees: View {
                     Text("Envoyées aujourd'hui").font(.petit.weight(.semibold)).foregroundStyle(Color.texte2)
                         .padding(.top, attente.isEmpty ? 0 : 6)
                     ForEach(Array(parties.prefix(4))) { d in
-                        let l = d.transmise && d.remise == nil ? (texte: "transmis à \(d.pour)", fait: true)
+                        let l = d.transmise && d.remise == nil ? (texte: L("transmis à \(d.pour)"), fait: true)
                             : Facteur.libelle(d.remise, pour: d.pour, veille: etat.prochaineVeille)
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Image(systemName: l.fait ? "checkmark.circle.fill" : (d.remise?.etat == .retire ? "minus.circle" : "clock"))
@@ -791,11 +788,12 @@ struct LigneRappel: View {
 
     private var echeance: String {
         guard let d = rappel.echeance else { return "" }
-        if rappel.enRetard { return "En retard · \(Dates.court(Dates.jour.string(from: d)))" }
+        if rappel.enRetard { return L("En retard · \(Dates.court(Dates.jour.string(from: d)))") }
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "HH:mm"
         let h = f.string(from: d)
-        return h == "00:00" ? "Aujourd'hui" : h
+        return h == "00:00" ? L("Aujourd'hui") : h
     }
 }
 
@@ -813,13 +811,15 @@ struct LigneRendezVous: View {
             if let url = rv.url {
                 Button("Rejoindre") { NSWorkspace.shared.open(url) }.controlSize(.small)
             }
+            BoutonPip(rv: rv)    // invisible si Pip n'est pas installé
         }
     }
     private var horaire: String {
-        if rv.journee { return "Toute la journée" }
+        if rv.journee { return L("Toute la journée") }
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "HH:mm"
-        return "\(f.string(from: rv.debut)) à \(f.string(from: rv.fin))"
+        return Loc.plage(f.string(from: rv.debut), f.string(from: rv.fin))
     }
 }
 
@@ -851,7 +851,7 @@ struct LigneAEnvoyer: View {
             }
             ParcoursContact(contact: message.contact, compact: true)
             if !message.evenement.objet.isEmpty {
-                Text(message.evenement.canal == "mail" ? "Objet : \(message.evenement.objet)" : "À : \(message.evenement.objet)")
+                Text(message.evenement.canal == "mail" ? L("Objet : \(message.evenement.objet)") : L("À : \(message.evenement.objet)"))
                     .font(.secondaire.weight(.medium)).foregroundStyle(Color.texte2)
             }
             Text(message.evenement.texte).font(.ligne).foregroundStyle(Color.texte).textSelection(.enabled)
@@ -861,7 +861,7 @@ struct LigneAEnvoyer: View {
                 .help(deplie ? "" : "Cliquer pour tout lire")
             ConditionEnvoi(evenement: message.evenement)
             if let f = dansLaFile {
-                Text(f.etat == "envoi" ? "Dans la file d'envoi : envoi en cours" : "Dans la file d'envoi : part vers \(heureFile(f.prevuLe))")
+                Text(f.etat == "envoi" ? L("Dans la file d'envoi : envoi en cours") : L("Dans la file d'envoi : part vers \(heureFile(f.prevuLe))"))
                     .font(.secondaire.weight(.medium)).foregroundStyle(Color.vert)
             }
             HStack(spacing: 8) {
@@ -969,7 +969,7 @@ struct BoutonOuvrirMail: View {
             do { try await Mail.repondre(a: id, texte: evenement.texte); return }
             catch Mail.ErreurMail.echec(let m) where m.contains("4401") {
                 try await Mail.brouillon(a: contact.email, objet: evenement.objet, texte: evenement.texte)
-                erreur = "Le mail d'origine n'est pas dans Mail : ce brouillon est un nouveau mail, hors du fil. « Envoyer depuis Gmail » le garde dans le fil."
+                erreur = L("Le mail d'origine n'est pas dans Mail : ce brouillon est un nouveau mail, hors du fil. « Envoyer depuis Gmail » le garde dans le fil.")
                 return
             }
         }
@@ -986,12 +986,12 @@ struct LigneContactDu: View {
                     Text(contact.titre).font(.ligneForte).foregroundStyle(Color.texte)
                     if !contact.sousTitre.isEmpty { Text(contact.sousTitre).font(.secondaire).foregroundStyle(Color.texte2) }
                 }
-                Text(contact.prochaineAction.isEmpty ? "Prochaine action à préciser" : contact.prochaineAction)
+                Text(contact.prochaineAction.isEmpty ? L("Prochaine action à préciser") : contact.prochaineAction)
                     .font(.secondaire).foregroundStyle(Color.texte2).lineLimit(2)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text(contact.prochaineDate < Dates.aujourdhui() ? "En retard · \(Dates.court(contact.prochaineDate))" : "Aujourd'hui")
+                Text(contact.prochaineDate < Dates.aujourdhui() ? L("En retard · \(Dates.court(contact.prochaineDate))") : L("Aujourd'hui"))
                     .font(.secondaire).foregroundStyle(contact.prochaineDate < Dates.aujourdhui() ? Color.rouge : Color.texte2)
                 Pastille(texte: Libelles.etape(contact.etape), couleur: Couleurs.etape(contact.etape))
             }
@@ -1011,7 +1011,7 @@ struct LigneMail: View {
                 Text(message.objet).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
             }
             Spacer()
-            Text(message.date.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(Locale(identifier: "fr_FR"))))
+            Text(message.date.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(Loc.locale)))
                 .font(.petit).foregroundStyle(Color.texte3)
         }
         .contentShape(Rectangle())
@@ -1028,12 +1028,12 @@ struct LigneInscrit: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(inscrit.nom.isEmpty ? inscrit.entreprise : inscrit.nom).font(.ligneForte).foregroundStyle(Color.texte)
-                Text([inscrit.entreprise, inscrit.telephone.isEmpty ? "" : "tél."].filter { !$0.isEmpty }.joined(separator: " · "))
+                Text([inscrit.entreprise, inscrit.telephone.isEmpty ? "" : L("tél.")].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(Dates.court(Dates.jour.string(from: inscrit.inscritLe))) · \(inscrit.devis) devis")
+                Text(L("\(Dates.court(Dates.jour.string(from: inscrit.inscritLe))) · \(inscrit.devis) devis"))
                     .font(.secondaire.monospacedDigit()).foregroundStyle(Color.texte2)
                 if let c = suivi {
                     Button("Voir la fiche") { etat.ouvrir(c) }.buttonStyle(.link).font(.petit)

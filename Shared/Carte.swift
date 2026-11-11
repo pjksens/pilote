@@ -63,14 +63,15 @@ struct ResultatsRecherche: Codable {
 }
 
 enum Libelles2 {
+    /// (clé stockée, libellé affiché) : calculé, la langue se lit à l'appel. Les noms peuvent être renommés dans reglages.json.
     static var espaces: [(String, String)] {
         Reglages.nommer([
-            ("kryva", "KRYVA"), ("krydor", "Krydor"), ("freelance", "Freelance"), ("perso", "Projets perso"), ("outils", "Outils"),
-            ("cours", "Cours"), ("administratif", "Papiers et secrets"),
+            ("kryva", "KRYVA"), ("krydor", "Krydor"), ("freelance", "Freelance"), ("perso", L("Projets perso")), ("outils", L("Outils")),
+            ("cours", L("Cours")), ("administratif", L("Papiers et secrets")),
         ])
     }
     static func espace(_ cle: String) -> String { espaces.first { $0.0 == cle }?.1 ?? cle }
-    static let statuts: [(String, String)] = [("actif", "Actif"), ("en_pause", "En pause"), ("archive", "Archivé")]
+    static var statuts: [(String, String)] { [("actif", L("Actif")), ("en_pause", L("En pause")), ("archive", L("Archivé"))] }
     static func statut(_ cle: String) -> String { statuts.first { $0.0 == cle }?.1 ?? cle }
 }
 

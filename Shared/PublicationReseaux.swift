@@ -99,6 +99,11 @@ enum HTTP {
         var sortie: (Data?, URLResponse?, Error?)
         let tache: URLSessionTask
         if let fichier {
+            // Le délai par défaut d'un URLRequest (60 s) l'emporte sur celui de la session (120 s) : un gros fichier envoyé d'un
+            // seul coup (Reel 4K de 1,1 Go chez Instagram) tombait « The request timed out » au bout de ~55 s. Ce délai compte
+            // l'inactivité, y compris l'attente de la réponse après le dernier octet.
+            var r = r
+            r.timeoutInterval = 1800
             tache = session.uploadTask(with: r, fromFile: fichier) { d, rep, e in sortie = (d, rep, e); fin.signal() }
         } else {
             tache = session.dataTask(with: r) { d, rep, e in sortie = (d, rep, e); fin.signal() }
@@ -478,8 +483,59 @@ final class PlateformesReelles: Plateformes {
         return (id, rep.json["username"] as? String ?? "")
     }
 
-    /// Conteneur REELS et envoi direct du fichier depuis le Mac (upload_type=resumable, rupload.facebook.com) : rien de public.
+    /// Au-delà de cette durée, l'envoi direct tombe en ProcessingFailedError (mesuré le 10/11 : 15 s en 4K passe, 33 s non) :
+    /// Instagram télécharge alors la vidéo par un lien temporaire (TunnelVideo, accord de Sacha le 10/11).
+    static let dureeEnvoiDirectMax: Double = 20
+
+    /// L'envoi direct a échoué parce que la vidéo est trop longue pour lui (pas pour une autre raison).
+    static func traitementTropLong(_ e: Error) -> Bool {
+        guard case ErreurPlateforme.definitive(let m) = e else { return false }
+        return m.contains("ProcessingFailedError")
+    }
+
+    /// Conteneur REELS prêt avant l'heure, rien de public. Vidéo courte : envoi direct depuis le Mac. Vidéo longue (ou envoi
+    /// direct refusé pour sa longueur) : lien temporaire, et on attend FINISHED avant de rendre la main.
     func instagramPreparer(_ p: Publication, fichier: URL) throws -> String {
+        if let d = Publications.infosVideo(fichier)?.duree, d > Self.dureeEnvoiDirectMax {
+            return try instagramPreparerParTunnel(p, fichier: fichier)
+        }
+        do { return try instagramPreparerDirect(p, fichier: fichier) } catch let e where Self.traitementTropLong(e) {
+            return try instagramPreparerParTunnel(p, fichier: fichier)
+        }
+    }
+
+    /// Lien temporaire ouvert le temps qu'Instagram lise la vidéo (FINISHED), puis coupé ; 15 min au plus (TunnelVideo).
+    func instagramPreparerParTunnel(_ p: Publication, fichier: URL, trace: (String) -> Void = PlateformesReelles.traceEnvoi) throws -> String {
+        let tunnel = try TunnelVideo(fichier: fichier)
+        defer { tunnel.fermer(); trace("tunnel fermé après \(Int(tunnel.ouvertDepuis)) s") }
+        trace("tunnel ouvert : \(URL(string: tunnel.adresse)?.host ?? "?")")
+        let id = try instagramPreparer(p, adresse: tunnel.adresse)
+        trace("conteneur créé (video_url) : \(id)")
+        while tunnel.ouvertDepuis < TunnelVideo.dureeMax - 30 {
+            Thread.sleep(forTimeInterval: 10)
+            let c: ConteneurInstagram
+            do { c = try instagramConteneur(compte: p.compte, conteneur: id) } catch ErreurPlateforme.passagere(_) { continue }
+            switch c.code {
+            case "FINISHED":
+                trace("FINISHED après \(Int(tunnel.ouvertDepuis)) s")
+                return id
+            case "IN_PROGRESS", "":
+                continue
+            default:
+                throw ErreurPlateforme.passagere("Instagram n'a pas pu lire la vidéo par le lien temporaire (\(c.code) \(c.detail))")
+            }
+        }
+        throw ErreurPlateforme.passagere("Instagram n'a pas fini de lire la vidéo en \(Int(TunnelVideo.dureeMax / 60)) min (lien temporaire coupé)")
+    }
+
+    /// Trace sur stderr si PILOTE_TRACE_ENVOI est posé (essais à la main).
+    static func traceEnvoi(_ m: String) {
+        guard ProcessInfo.processInfo.environment["PILOTE_TRACE_ENVOI"] != nil else { return }
+        FileHandle.standardError.write(Data("\(Dates.iso.string(from: Date())) \(m)\n".utf8))
+    }
+
+    /// Conteneur REELS et envoi direct du fichier depuis le Mac (upload_type=resumable, rupload.facebook.com) : rien de public.
+    func instagramPreparerDirect(_ p: Publication, fichier: URL) throws -> String {
         let j = try jetonInstagram(p.compte)
         let moi = j.externeId.isEmpty ? "me" : j.externeId
         var champs = ["media_type": "REELS", "upload_type": "resumable", "caption": p.texte, "share_to_feed": "true"]
@@ -489,14 +545,74 @@ final class PlateformesReelles: Plateformes {
         guard rep.code == 200, let id = rep.json["id"] as? String else { throw Self.erreurInstagram(rep, "création du conteneur") }
         let uri = rep.json["uri"] as? String ?? "https://rupload.facebook.com/ig-api-upload/\(Self.versionGraph)/\(id)"
         guard let u = URL(string: uri) else { throw ErreurPlateforme.definitive("adresse d'envoi Instagram illisible") }
+        try instagramEnvoyerParMorceaux(u, jeton: j.acces, fichier: fichier)
+        return id
+    }
+
+    /// Taille d'un morceau envoyé à rupload. 10/11 : un envoi d'un seul tenant tombe en « HTTP 400 ProcessingFailedError »
+    /// (retriable=false) ~32 s après son début dès que la vidéo dépasse ~26 s (4K comme 1080) ; en morceaux, chaque requête reste courte.
+    static let morceauInstagram = 8 * 1024 * 1024
+
+    /// Les tranches [début, fin) d'un fichier de `taille` octets, en morceaux de `morceau` octets (le dernier plus court).
+    static func morceaux(taille: Int, morceau: Int) -> [Range<Int>] {
+        guard taille > 0, morceau > 0 else { return [] }
+        return stride(from: 0, to: taille, by: morceau).map { $0..<min($0 + morceau, taille) }
+    }
+
+    /// Envoi « resumable » de rupload : chaque morceau porte offset = son début et file_size = la taille totale.
+    /// Un morceau qui échoue pour une raison passagère est renvoyé (3 essais) ; sinon l'envoi s'arrête là.
+    func instagramEnvoyerParMorceaux(_ u: URL, jeton: String, fichier: URL, morceau: Int = PlateformesReelles.morceauInstagram) throws {
         let taille = (try FileManager.default.attributesOfItem(atPath: fichier.path)[.size] as? Int) ?? 0
-        var r = URLRequest(url: u)
-        r.httpMethod = "POST"
-        r.setValue("OAuth \(j.acces)", forHTTPHeaderField: "Authorization")
-        r.setValue("0", forHTTPHeaderField: "offset")
-        r.setValue("\(taille)", forHTTPHeaderField: "file_size")
-        let envoi = try HTTP.envoyer(r, fichier: fichier)
-        guard envoi.code == 200 else { throw Self.erreurInstagram(envoi, "envoi de la vidéo à Instagram") }
+        guard taille > 0 else { throw ErreurPlateforme.definitive("fichier vide : \(fichier.lastPathComponent)") }
+        let h = try FileHandle(forReadingFrom: fichier)
+        defer { try? h.close() }
+        let tranches = Self.morceaux(taille: taille, morceau: morceau)
+        for (n, t) in tranches.enumerated() {
+            try h.seek(toOffset: UInt64(t.lowerBound))
+            guard let bout = try h.read(upToCount: t.count), bout.count == t.count else {
+                throw ErreurPlateforme.definitive("lecture du fichier interrompue à l'octet \(t.lowerBound)")
+            }
+            var r = URLRequest(url: u)
+            r.httpMethod = "POST"
+            r.timeoutInterval = 600
+            r.setValue("OAuth \(jeton)", forHTTPHeaderField: "Authorization")
+            r.setValue("\(t.lowerBound)", forHTTPHeaderField: "offset")
+            r.setValue("\(taille)", forHTTPHeaderField: "file_size")
+            r.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            r.httpBody = bout
+            var essai = 0
+            while true {
+                essai += 1
+                do {
+                    let debut = Date()
+                    let rep = try HTTP.envoyer(r)
+                    if ProcessInfo.processInfo.environment["PILOTE_TRACE_ENVOI"] != nil {
+                        FileHandle.standardError.write(Data(String(format: "%@ morceau %d/%d HTTP %d en %.1f s\n",
+                            Dates.iso.string(from: Date()), n + 1, tranches.count, rep.code, Date().timeIntervalSince(debut)).utf8))
+                    }
+                    // Morceau du milieu : rupload répond 206 « PartialRequestError … did not match length of file » = reçu,
+                    // il attend la suite. Le dernier morceau doit finir en 200.
+                    let dernier = n == tranches.count - 1
+                    guard rep.code == 200 || (!dernier && rep.code == 206) else {
+                        throw Self.erreurInstagram(rep, "envoi de la vidéo à Instagram (morceau \(n + 1)/\(tranches.count))")
+                    }
+                    break
+                } catch ErreurPlateforme.passagere(_) where essai < 3 {
+                    Thread.sleep(forTimeInterval: Double(5 * essai))
+                }
+            }
+        }
+    }
+
+    /// Conteneur REELS avec video_url : Instagram télécharge la vidéo lui-même et la traite sans la limite de ~30 s de rupload.
+    /// L'adresse doit rester joignable tant que le conteneur est IN_PROGRESS (voir TunnelVideo).
+    func instagramPreparer(_ p: Publication, adresse: String) throws -> String {
+        let j = try jetonInstagram(p.compte)
+        let moi = j.externeId.isEmpty ? "me" : j.externeId
+        var champs = ["media_type": "REELS", "video_url": adresse, "caption": p.texte, "share_to_feed": "true"]
+        if p.couvertureMs >= 0 { champs["thumb_offset"] = String(p.couvertureMs) }
+        let rep = try graph("\(moi)/media", champs, jeton: j.acces, methode: "POST")
+        guard rep.code == 200, let id = rep.json["id"] as? String else { throw Self.erreurInstagram(rep, "création du conteneur (video_url)") }
         return id
     }
 

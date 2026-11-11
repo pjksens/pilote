@@ -21,7 +21,7 @@ struct BarreMenusVue: View {
                 Text("\(duJour.count) à faire").font(.secondaire).foregroundStyle(Color.texte2)
                 Spacer()
                 if !etat.dus.isEmpty || !etat.aEnvoyerAujourdhui.isEmpty {
-                    Text("\(etat.dus.count) relance\(etat.dus.count > 1 ? "s" : "") · \(etat.aEnvoyerAujourdhui.count) à envoyer")
+                    Text(L("\(etat.dus.count) relances") + " · " + L("\(etat.aEnvoyerAujourdhui.count) à envoyer"))
                         .font(.petit).foregroundStyle(Color.texte2)
                 }
             }

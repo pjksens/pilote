@@ -87,8 +87,8 @@ enum ATOI {
     /// Le domaine d'une liste, dit comme sur l'écran.
     static func domaine(_ liste: String) -> String {
         switch liste {
-        case "Appels": return "Ventes"
-        case "Contenu": return "Réseaux"
+        case "Appels": return L("Ventes")
+        case "Contenu": return L("Réseaux")
         default: return liste
         }
     }
@@ -107,7 +107,7 @@ enum ATOI {
         let chemin = p.source.isEmpty ? p.fichier : p.source
         let nom = ((chemin as NSString).lastPathComponent as NSString).deletingPathExtension
         if !nom.isEmpty { return nom }
-        return "Vidéo " + Domaines.nomCompte(p.compte)
+        return L("Vidéo \(Domaines.nomCompte(p.compte))")
     }
 }
 
@@ -157,6 +157,8 @@ struct GesteSacha: Identifiable {
     var bloque = false
     /// En retard (09/11, Organisation : une heure passée doit se voir) : le verbe s'écrit en rouge.
     var retard = false
+    /// Une décision sans options : le bouton « C'est réglé » la ferme (le code lit ce champ, jamais le texte du bouton, qui se traduit).
+    var reglable = false
 
     /// Ce que la ligne compte dans « À toi » : ses gestes (un groupe compte chacun des siens ; demain ne compte pas).
     var gestes: [GesteSacha] {
@@ -177,8 +179,8 @@ struct GesteSacha: Identifiable {
         let candidats = Dictionary(s.candidatsFile.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 
         for m in s.aValider {
-            g.append(GesteSacha(id: "texte:\(m.id)", genre: .texte(m), verbe: "Valider le texte", objet: m.contact.nom,
-                                contexte: Self.debut(m.evenement.texte), bouton: "Valider", symbole: "text.bubble",
+            g.append(GesteSacha(id: "texte:\(m.id)", genre: .texte(m), verbe: L("Valider le texte"), objet: m.contact.nomAffiche,
+                                contexte: Self.debut(m.evenement.texte), bouton: L("Valider"), symbole: "text.bubble",
                                 urgence: 30, quand: Dates.iso.date(from: m.evenement.le)))
         }
         for m in s.aEnvoyer where (m.jour.isEmpty || m.jour <= aujourdhui) && !m.evenement.conditionEnAttente {
@@ -186,27 +188,27 @@ struct GesteSacha: Identifiable {
             let resume = m.evenement.objet.isEmpty ? Self.debut(m.evenement.texte) : m.evenement.objet
             if m.evenement.canal == "mail" {
                 if let c = candidats[m.id], c.envoyable {
-                    g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoiMail(m), verbe: "Envoyer", objet: m.contact.nom,
-                                        contexte: "\(canal) · \(resume)", bouton: "Envoyer", symbole: "paperplane",
+                    g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoiMail(m), verbe: L("Envoyer"), objet: m.contact.nomAffiche,
+                                        contexte: "\(canal) · \(resume)", bouton: L("Envoyer"), symbole: "paperplane",
                                         urgence: 40, quand: nil))
                 } else {
                     // 09/11 : un mail prêt que Pilote ne peut pas envoyer ne disparaît plus (Gmail pas connecté, objet vide…).
-                    let raison = candidats[m.id]?.refus.first ?? "pas encore vérifié par Pilote"
-                    g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoi(m), verbe: "Envoyer à la main", objet: m.contact.nom,
-                                        contexte: "Pilote ne peut pas l'envoyer : \(raison)", bouton: "Envoyé",
+                    let raison = candidats[m.id]?.refus.first ?? L("pas encore vérifié par Pilote")
+                    g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoi(m), verbe: L("Envoyer à la main"), objet: m.contact.nomAffiche,
+                                        contexte: L("Pilote ne peut pas l'envoyer : \(raison)"), bouton: L("Envoyé"),
                                         symbole: "paperplane", urgence: 40, quand: nil, bloque: true))
                 }
             } else {
-                g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoi(m), verbe: "Envoyer", objet: m.contact.nom,
-                                    contexte: "\(canal) · \(Self.debut(m.evenement.texte))", bouton: "Envoyé",
+                g.append(GesteSacha(id: "envoi:\(m.id)", genre: .envoi(m), verbe: L("Envoyer"), objet: m.contact.nomAffiche,
+                                    contexte: "\(canal) · \(Self.debut(m.evenement.texte))", bouton: L("Envoyé"),
                                     symbole: "paperplane", urgence: 40, quand: nil))
             }
         }
         for q in s.questions {
             let a = q.activite
             let choix = Self.choixSurLaLigne(a.choix)
-            g.append(GesteSacha(id: "question:\(a.questionRef)", genre: .question(q), verbe: "Répondre", objet: q.nom,
-                                contexte: a.question, bouton: choix.isEmpty ? "Répondre" : "", symbole: "questionmark.bubble",
+            g.append(GesteSacha(id: "question:\(a.questionRef)", genre: .question(q), verbe: L("Répondre"), objet: q.nom,
+                                contexte: a.question, bouton: choix.isEmpty ? L("Répondre") : "", symbole: "questionmark.bubble",
                                 urgence: 10, quand: a.depuis, choix: choix))
         }
         // Une décision ❓ attend Sacha dès qu'elle est posée : celles dont l'échéance est plus tard viennent aussi, avec leur date.
@@ -215,13 +217,13 @@ struct GesteSacha: Identifiable {
             let options = Decisions.options(r.notes)
             let choix = Self.choixSurLaLigne(options)
             let detail = Decisions.contexte(r.notes).components(separatedBy: "\n").first { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? ""
-            let pour = aVenir.contains(r.id) ? r.echeance.map { "Pour \(Libelles.quand($0, maintenant: maintenant))" } : nil
-            g.append(GesteSacha(id: "decision:\(r.id)", genre: .decision(r), verbe: "Décider", objet: Decisions.question(r.titre),
+            let pour = aVenir.contains(r.id) ? r.echeance.map { L("Pour \(Libelles.quand($0, maintenant: maintenant))") } : nil
+            g.append(GesteSacha(id: "decision:\(r.id)", genre: .decision(r), verbe: L("Décider"), objet: Decisions.question(r.titre),
                                 contexte: [pour, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
-                                bouton: options.isEmpty ? "C'est réglé" : (choix.isEmpty ? "Répondre" : ""),
+                                bouton: options.isEmpty ? L("C'est réglé") : (choix.isEmpty ? L("Répondre") : ""),
                                 symbole: "questionmark.circle",
                                 urgence: Domaines.urgenceDecision(echeance: r.echeance, enRetard: r.enRetard, maintenant: maintenant),
-                                quand: r.echeance, choix: choix, retard: r.enRetard))
+                                quand: r.echeance, choix: choix, retard: r.enRetard, reglable: options.isEmpty))
         }
         for r in s.rappels where !Decisions.estDecision(r.titre) && ATOI.listeDeSacha(r.liste) {
             g.append(Self.tache(r, maintenant: maintenant))
@@ -235,56 +237,56 @@ struct GesteSacha: Identifiable {
             guard let geste = Domaines.gesteSacha(r) else { continue }
             let nom = c.nom.isEmpty ? c.entreprise : Domaines.nomEtEntreprise(c.nom, c.entreprise)
             let retard = c.prochaineDate < aujourdhui
-            g.append(GesteSacha(id: "prospect:\(c.id)", genre: .prospect(c), verbe: retard ? "En retard" : "Aujourd'hui", objet: nom,
-                                contexte: geste, bouton: "Fait", symbole: "person.crop.circle",
+            g.append(GesteSacha(id: "prospect:\(c.id)", genre: .prospect(c), verbe: retard ? L("En retard") : L("Aujourd'hui"), objet: nom,
+                                contexte: geste, bouton: L("Fait"), symbole: "person.crop.circle",
                                 urgence: retard ? 20 : 45, quand: Dates.jour.date(from: c.prochaineDate), retard: retard))
         }
         for p in s.publications where Domaines.estDansBoiteTikTok(p) {
-            g.append(GesteSacha(id: "tiktok:\(p.id)", genre: .tiktok(p), verbe: "Publier sur TikTok",
+            g.append(GesteSacha(id: "tiktok:\(p.id)", genre: .tiktok(p), verbe: L("Publier sur TikTok"),
                                 objet: ATOI.titre(p, videos: s.videos),
-                                contexte: "Publie le brouillon dans l'app TikTok, puis clique Publiée"
-                                    + (p.prevu.map { " · prévue \(Libelles.quand($0, maintenant: maintenant))" } ?? ""),
-                                bouton: "Publiée", symbole: "arrow.up.circle", urgence: 45, quand: p.prevu))
+                                contexte: L("Publie le brouillon dans l'app TikTok, puis clique Publiée")
+                                    + (p.prevu.map { " · " + L("prévue \(Libelles.quand($0, maintenant: maintenant))") } ?? ""),
+                                bouton: L("Publiée"), symbole: "arrow.up.circle", urgence: 45, quand: p.prevu))
         }
         for p in s.publications where p.etat == "a_valider" {
-            g.append(GesteSacha(id: "publication:\(p.id)", genre: .publication(p), verbe: "Valider la publication",
+            g.append(GesteSacha(id: "publication:\(p.id)", genre: .publication(p), verbe: L("Valider la publication"),
                                 objet: ATOI.titre(p, videos: s.videos),
                                 contexte: Domaines.nomCompte(p.compte) + (p.prevu.map { " · \(Libelles.jourHeure($0))" } ?? ""),
-                                bouton: "Valider", symbole: "play.rectangle", urgence: 35, quand: p.prevu))
+                                bouton: L("Valider"), symbole: "play.rectangle", urgence: 35, quand: p.prevu))
         }
         // Un rendez-vous commencé sort de « À toi » (09/11 : « Salle 11:00 » restait en tête à 12:40).
         for r in s.rendezVous where !r.journee && r.debut > maintenant {
             let bientot = r.debut.timeIntervalSince(maintenant) < 2 * 3600
-            let bouton = r.url != nil ? "Rejoindre" : (r.lieu.isEmpty ? "" : "Itinéraire")
-            g.append(GesteSacha(id: "rdv:\(r.id):\(Int(r.debut.timeIntervalSince1970))", genre: .rendezVous(r), verbe: "Rendez-vous",
-                                objet: r.titre, contexte: "à \(Self.heure(r.debut))" + (r.lieu.isEmpty ? "" : " · \(Self.uneLigne(r.lieu))"),
+            let bouton = r.url != nil ? L("Rejoindre") : (r.lieu.isEmpty ? "" : L("Itinéraire"))
+            g.append(GesteSacha(id: "rdv:\(r.id):\(Int(r.debut.timeIntervalSince1970))", genre: .rendezVous(r), verbe: L("Rendez-vous"),
+                                objet: r.titre, contexte: L("à \(Self.heure(r.debut))") + (r.lieu.isEmpty ? "" : " · \(Self.uneLigne(r.lieu))"),
                                 bouton: bouton, symbole: "calendar", urgence: bientot ? 0 : 60, quand: r.debut))
         }
         if VideoCalcul.estOuvre(aujourdhui) {
             let demain = VideoCalcul.lendemainOuvre(aujourdhui)
             for v in s.videos where v.jour == demain && v.statut == "valide" {
-                g.append(GesteSacha(id: "tourner:\(v.id)", genre: .tourner(v), verbe: "Tourner", objet: v.sujet,
-                                    contexte: "Vidéo \(VideoVocabulaire.compte(v.compte)) pour le \(Dates.court(demain))"
-                                        + (v.prompteur.isEmpty ? "" : " · prompteur prêt"),
-                                    bouton: "Tournée", symbole: "video", urgence: 70, quand: nil))
+                g.append(GesteSacha(id: "tourner:\(v.id)", genre: .tourner(v), verbe: L("Tourner"), objet: v.sujet,
+                                    contexte: L("Vidéo \(VideoVocabulaire.compte(v.compte)) pour le \(Dates.court(demain))")
+                                        + (v.prompteur.isEmpty ? "" : " · " + L("prompteur prêt")),
+                                    bouton: L("Tournée"), symbole: "video", urgence: 70, quand: nil))
             }
             for v in s.videos where v.jour == aujourdhui && v.statut == "prete" {
                 let programmee = s.publications.contains {
                     $0.etat != "annule" && $0.prevuLe.hasPrefix(aujourdhui) && $0.compte.hasSuffix(v.compte)
                 }
                 if programmee { continue }
-                g.append(GesteSacha(id: "publier:\(v.id)", genre: .publier(v), verbe: "Publier", objet: v.sujet,
-                                    contexte: "Vidéo \(VideoVocabulaire.compte(v.compte)) prête, pas programmée : publie-la, puis clique Publiée",
-                                    bouton: "Publiée", symbole: "arrow.up.circle", urgence: 45, quand: nil))
+                g.append(GesteSacha(id: "publier:\(v.id)", genre: .publier(v), verbe: L("Publier"), objet: v.sujet,
+                                    contexte: L("Vidéo \(VideoVocabulaire.compte(v.compte)) prête, pas programmée : publie-la, puis clique Publiée"),
+                                    bouton: L("Publiée"), symbole: "arrow.up.circle", urgence: 45, quand: nil))
             }
         }
         if SeanceDimanche.affichee(aujourdhui) {
             let c = SeanceDimanche.creneaux(s.videos, aujourdhui: aujourdhui)
             let reste = c.filter { !$0.choisi }.count
             if reste > 0 {
-                g.append(GesteSacha(id: "seance:\(aujourdhui)", genre: .seance, verbe: "Choisir les sujets",
-                                    objet: "semaine du \(DemainPret.libelleJour(SeanceDimanche.semaine(aujourdhui).first ?? aujourdhui))",
-                                    contexte: "\(c.count - reste) sur \(c.count) choisis", bouton: "Choisir", symbole: "list.bullet.rectangle",
+                g.append(GesteSacha(id: "seance:\(aujourdhui)", genre: .seance, verbe: L("Choisir les sujets"),
+                                    objet: L("semaine du \(DemainPret.libelleJour(SeanceDimanche.semaine(aujourdhui).first ?? aujourdhui))"),
+                                    contexte: L("\(c.count - reste) sur \(c.count) choisis"), bouton: L("Choisir"), symbole: "list.bullet.rectangle",
                                     urgence: 55, quand: nil))
             }
         }
@@ -295,10 +297,10 @@ struct GesteSacha: Identifiable {
             .sorted { ($0.echeance ?? .distantFuture) < ($1.echeance ?? .distantFuture) }
         if !demain.isEmpty {
             let noms = demain.prefix(2).map(\.titre).joined(separator: ", ")
-            g.append(GesteSacha(id: "demain:\(aujourdhui)", genre: .demain(demain), verbe: "Demain",
-                                objet: demain.count == 1 ? "1 tâche" : "\(demain.count) tâches",
-                                contexte: demain.count > 2 ? "\(noms) et \(demain.count - 2) autres" : noms,
-                                bouton: "Voir", symbole: "sunrise", urgence: Int.max, quand: nil))
+            g.append(GesteSacha(id: "demain:\(aujourdhui)", genre: .demain(demain), verbe: L("Demain"),
+                                objet: demain.count == 1 ? L("1 tâche") : L("\(demain.count) tâches"),
+                                contexte: demain.count > 2 ? noms + " " + L("et \(demain.count - 2) autres") : noms,
+                                bouton: L("Voir"), symbole: "sunrise", urgence: Int.max, quand: nil))
         }
         return g
     }
@@ -310,10 +312,10 @@ struct GesteSacha: Identifiable {
         let n = r.count
         let pour = r.map(\.pour).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         let premiere = r.first.map { "\($0.question) → \($0.choix)" } ?? ""
-        return GesteSacha(id: idReponses(r), genre: .reponses(r), verbe: "Envoyer",
-                          objet: n == 1 ? "ta réponse" : "tes \(n) réponses",
-                          contexte: (["pour " + pour.joined(separator: ", ")] + (n == 1 ? [premiere] : [])).joined(separator: " · "),
-                          bouton: n == 1 ? "Envoyer" : "Tout envoyer (\(n))", symbole: "paperplane.fill",
+        return GesteSacha(id: idReponses(r), genre: .reponses(r), verbe: L("Envoyer"),
+                          objet: n == 1 ? L("ta réponse") : L("tes \(n) réponses"),
+                          contexte: ([L("pour \(pour.joined(separator: ", "))")] + (n == 1 ? [premiere] : [])).joined(separator: " · "),
+                          bouton: n == 1 ? L("Envoyer") : L("Tout envoyer (\(n))"), symbole: "paperplane.fill",
                           urgence: 8, quand: nil)
     }
     static func idReponses(_ r: [Decisions.Envoyee]) -> String { "reponses:" + r.map { String($0.id) }.joined(separator: ",") }
@@ -325,18 +327,18 @@ struct GesteSacha: Identifiable {
         let retard = r.enRetard || echeance < debutJour || (r.avecHeure && echeance < maintenant)
         let (verbe, urgence): (String, Int)
         if retard {
-            (verbe, urgence) = ("En retard", 20)
+            (verbe, urgence) = (L("En retard"), 20)
         } else if r.avecHeure {
             let ecart = echeance.timeIntervalSince(maintenant)
-            (verbe, urgence) = ("À \(heure(echeance))", ecart <= 0 ? 22 : (ecart < 2 * 3600 ? 25 : 48))
+            (verbe, urgence) = (L("À \(heure(echeance))"), ecart <= 0 ? 22 : (ecart < 2 * 3600 ? 25 : 48))
         } else {
-            (verbe, urgence) = ("Aujourd'hui", 46)
+            (verbe, urgence) = (L("Aujourd'hui"), 46)
         }
         let but = NotesPlanning.lire(r.notes).but ?? ""
-        let depuis = retard ? "prévu \(Libelles.quand(echeance, maintenant: maintenant))" : ""
+        let depuis = retard ? L("prévu \(Libelles.quand(echeance, maintenant: maintenant))") : ""
         let contexte = [ATOI.domaine(r.liste), depuis, but].filter { !$0.isEmpty }.joined(separator: " · ")
         return GesteSacha(id: "rappel:\(r.id)", genre: .rappel(r), verbe: verbe, objet: Self.sansSacha(r.titre),
-                          contexte: contexte, bouton: "Fait", symbole: "checkmark.circle", urgence: urgence, quand: r.echeance,
+                          contexte: contexte, bouton: L("Fait"), symbole: "checkmark.circle", urgence: urgence, quand: r.echeance,
                           retard: retard)
     }
 
@@ -375,16 +377,16 @@ struct GesteSacha: Identifiable {
             let n = tous.count
             let (verbe, objet): (String, String)
             switch f {
-            case "texte": (verbe, objet) = ("Valider", "\(n) textes")
-            case "envoi": (verbe, objet) = ("Envoyer", "\(n) messages")
-            case "publication": (verbe, objet) = ("Valider", "\(n) publications")
+            case "texte": (verbe, objet) = (L("Valider"), L("\(n) textes"))
+            case "envoi": (verbe, objet) = (L("Envoyer"), L("\(n) messages"))
+            case "publication": (verbe, objet) = (L("Valider"), L("\(n) publications"))
             default:
                 let liste = f.replacingOccurrences(of: "rappel:", with: "")
-                (verbe, objet) = ("Faire", "\(n) tâches \(ATOI.domaine(liste))")
+                (verbe, objet) = (L("Faire"), L("\(n) tâches \(ATOI.domaine(liste))"))
             }
             let noms = tous.prefix(3).map(\.objet).joined(separator: ", ")
             res.append(GesteSacha(id: "groupe:\(f)", genre: .groupe(tous), verbe: verbe, objet: objet,
-                                  contexte: n > 3 ? "\(noms) et \(n - 3) autres" : noms, bouton: "Voir la liste",
+                                  contexte: n > 3 ? noms + " " + L("et \(n - 3) autres") : noms, bouton: L("Voir la liste"),
                                   symbole: g.symbole, urgence: g.urgence, quand: g.quand))
         }
         return res
@@ -408,7 +410,7 @@ struct GesteSacha: Identifiable {
     }
 
     private static let formatHeure: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "HH:mm"; return f
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "HH:mm"; return f
     }()
     static func heure(_ d: Date) -> String { formatHeure.string(from: d) }
 }
@@ -450,7 +452,7 @@ extension GesteSacha {
         case .publication(let p): return .validerPublication(p)
         case .tourner(let v): return .videoFaite(v, action: "tourner")
         case .publier(let v): return .videoFaite(v, action: "publier")
-        case .decision: return bouton == "C'est réglé" ? .choisir("réglé") : .deplier
+        case .decision: return reglable ? .choisir("réglé") : .deplier
         case .rendezVous(let r):
             if let u = r.url { return .ouvrir(u) }
             guard let q = r.lieu.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
@@ -473,29 +475,29 @@ enum ControleATOI {
         var a: [String: String] = [:]
         let aujourdhui = Dates.jour.string(from: s.maintenant)
         for r in s.rappels + s.decisionsAVenir {
-            if r.titre.trimmingCharacters(in: .whitespaces).hasPrefix("❓") { a["decision:\(r.id)"] = "décision « \(r.titre) »" }
-            else if CalendriersPlanning.listesTaches.contains(where: { $0.nom == r.liste }) { a["rappel:\(r.id)"] = "tâche « \(r.titre) »" }
+            if r.titre.trimmingCharacters(in: .whitespaces).hasPrefix("❓") { a["decision:\(r.id)"] = L("décision « \(r.titre) »") }
+            else if CalendriersPlanning.listesTaches.contains(where: { $0.nom == r.liste }) { a["rappel:\(r.id)"] = L("tâche « \(r.titre) »") }
         }
-        for q in s.questions { a["question:\(q.activite.questionRef)"] = "question de \(q.nom)" }
-        for m in s.aValider { a["texte:\(m.id)"] = "texte pour \(m.contact.nom)" }
+        for q in s.questions { a["question:\(q.activite.questionRef)"] = L("question de \(q.nom)") }
+        for m in s.aValider { a["texte:\(m.id)"] = L("texte pour \(m.contact.nomAffiche)") }
         for m in s.aEnvoyer {
             let du = m.jour.isEmpty || m.jour <= aujourdhui
             let conditionOuverte = !m.evenement.condition.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && m.evenement.conditionOkLe.isEmpty
-            if du && !conditionOuverte { a["envoi:\(m.id)"] = "message pour \(m.contact.nom)" }
+            if du && !conditionOuverte { a["envoi:\(m.id)"] = L("message pour \(m.contact.nomAffiche)") }
         }
         for c in s.dus {
             let r = ResumeContact(id: c.id, nom: c.nom, entreprise: c.entreprise, espace: c.espace, etape: c.etape,
                                   prochaineAction: c.prochaineAction, prochaineDate: c.prochaineDate)
-            if Domaines.gesteSacha(r) != nil { a["prospect:\(c.id)"] = "geste pour \(c.nom.isEmpty ? c.entreprise : c.nom)" }
+            if Domaines.gesteSacha(r) != nil { a["prospect:\(c.id)"] = L("geste pour \(c.nom.isEmpty ? c.entreprise : c.nom)") }
         }
-        if !s.reponses.isEmpty { a[GesteSacha.idReponses(s.reponses)] = "\(s.reponses.count) réponse(s) à envoyer" }
+        if !s.reponses.isEmpty { a[GesteSacha.idReponses(s.reponses)] = s.reponses.count == 1 ? L("1 réponse à envoyer") : L("\(s.reponses.count) réponses à envoyer") }
         for p in s.publications {
-            if p.etat == "a_valider" { a["publication:\(p.id)"] = "publication à valider" }
-            if p.compte.hasPrefix("tt") && p.etat == "envoye" && p.phase == "boite" { a["tiktok:\(p.id)"] = "brouillon TikTok à publier" }
+            if p.etat == "a_valider" { a["publication:\(p.id)"] = L("publication à valider") }
+            if p.compte.hasPrefix("tt") && p.etat == "envoye" && p.phase == "boite" { a["tiktok:\(p.id)"] = L("brouillon TikTok à publier") }
         }
         for r in s.rendezVous where !r.journee && r.debut > s.maintenant {
-            a["rdv:\(r.id):\(Int(r.debut.timeIntervalSince1970))"] = "rendez-vous « \(r.titre) »"
+            a["rdv:\(r.id):\(Int(r.debut.timeIntervalSince1970))"] = L("rendez-vous « \(r.titre) »")
         }
         return a
     }
@@ -514,7 +516,8 @@ enum ControleATOI {
     static func alerte(_ manquants: [String]) -> String? {
         guard !manquants.isEmpty else { return nil }
         let n = manquants.count
-        let liste = manquants.prefix(3).joined(separator: ", ") + (n > 3 ? " et \(n - 3) autres" : "")
-        return "À toi : \(n == 1 ? "1 chose ne s'affiche pas" : "\(n) choses ne s'affichent pas") (\(liste)). PILOTE est à prévenir."
+        let liste = manquants.prefix(3).joined(separator: ", ") + (n > 3 ? " " + L("et \(n - 3) autres") : "")
+        return n == 1 ? L("À toi : 1 chose ne s'affiche pas (\(liste)). PILOTE est à prévenir.")
+            : L("À toi : \(n) choses ne s'affichent pas (\(liste)). PILOTE est à prévenir.")
     }
 }

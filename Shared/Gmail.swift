@@ -18,13 +18,12 @@ enum Gmail {
         case nonConnecte, refuse, depuisKryva(String), autorisationTrousseau, echec(String)
         var errorDescription: String? {
             switch self {
-            case .nonConnecte: return "Gmail n'est pas encore connecté à Pilote."
-            case .refuse: return "Gmail a refusé le mot de passe d'application. Créez-en un nouveau et reconnectez Gmail."
-            case .depuisKryva(let a): return "Envoi refusé : l'expéditeur \(a) est dans un domaine interdit (reglages.json, domaines_interdits)."
+            case .nonConnecte: return L("Gmail n'est pas encore connecté à Pilote.")
+            case .refuse: return L("Gmail a refusé le mot de passe d'application. Créez-en un nouveau et reconnectez Gmail.")
+            case .depuisKryva(let a): return L("Envoi refusé : l'expéditeur \(a) est dans un domaine interdit (reglages.json, domaines_interdits).")
             case .autorisationTrousseau:
-                return "Le trousseau du Mac demande une autorisation pour l'outil pilote : sur le Mac, lancer une fois "
-                    + "« \(Identite.depot.path)/pilote gmail-acces » et cliquer « Toujours autoriser ». Rien n'est parti."
-            case .echec(let m): return "Gmail n'a pas accepté l'envoi (\(m))."
+                return L("Le trousseau du Mac demande une autorisation pour l'outil pilote : sur le Mac, lancer une fois « \(Identite.depot.path)/pilote gmail-acces » et cliquer « Toujours autoriser ». Rien n'est parti.")
+            case .echec(let m): return L("Gmail n'a pas accepté l'envoi (\(m)).")
             }
         }
     }

@@ -154,6 +154,8 @@ them. For each item, only write what you actually verified.
   <br><sub>Mode démo (<code>./scripts/demo.sh</code>) : données inventées, aucune vraie personne.</sub>
 </p>
 
+> L'interface de l'app suit la langue de votre Mac : français, anglais ou espagnol (anglais pour toute autre langue). Les commentaires du code, l'outil en ligne de commande `pilote` et le serveur MCP restent en français. Ce README existe en neuf langues.
+
 ## Ce que fait Pilote
 
 - **Un seul écran pour la journée** : rendez-vous (Calendrier), rappels du jour et en retard (Rappels, cochables),
@@ -170,6 +172,7 @@ them. For each item, only write what you actually verified.
   (⌘K) dans les projets, contacts, journal et fichiers (Spotlight).
 - **Envoi de mail sous contrôle** : un mail préparé ne part que sur un clic, depuis Gmail (SMTP, mot de passe
   d'application rangé dans le trousseau du Mac, jamais lu par Claude). Texte brut, réponse dans le bon fil.
+- **Pip, facultatif.** Si [Pip](https://github.com/pjksens/heypip) (une app d'encoche pour Mac qui suit les appels) est installée, un bouton « Lancer Pip » apparaît sur une visio de votre agenda : Pip s'ouvre avec le nom de l'appel et le contact lié. En option, Pilote l'ouvre tout seul deux minutes avant. Pip n'enregistre qu'après votre propre clic ; quand Claude a écrit le résumé de l'appel, Pilote le range dans le fil du contact. Elle lit votre agenda : elle suit donc `rappels_calendrier`, coupé par défaut.
 - **Publications** : programmation de vidéos sur YouTube, Instagram et TikTok, avec validation explicite avant chaque
   envoi (jetons dans le trousseau).
 - **Radar** : veille de comptes de réseaux sociaux (vues, rythme, idées), saisie à la main ou par une source payante qui
@@ -223,9 +226,9 @@ aucune permission d'enregistrement de l'écran.
 
 | | |
 |---|---|
-| ![Agents : les sessions Claude Code et leur journal](docs/captures/10-claude.png) | ![Contacts : le carnet, l'étape et la prochaine action](docs/captures/04-contacts.png) |
+| ![Agents : les sessions Claude Code et leur journal](docs/captures/09-claude.png) | ![Contacts : le carnet, l'étape et la prochaine action](docs/captures/04-contacts.png) |
 | ![Prospects : le tableau par étape](docs/captures/03-prospects.png) | ![Vidéos : la semaine, deux comptes](docs/captures/05-semaine.png) |
-| ![Tâches : glisser une carte pour changer son jour](docs/captures/08-taches.png) | ![Accueil en sombre](docs/captures/01-aujourdhui-sombre.png) |
+| ![Tâches : glisser une carte pour changer son jour](docs/captures/07-taches.png) | ![Accueil en sombre](docs/captures/01-aujourdhui-sombre.png) |
 
 Toutes les données des captures sont inventées (noms, entreprises, numéros en 06 39 98 00 0x, adresses en `.example`).
 

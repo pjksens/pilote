@@ -85,7 +85,7 @@ struct FicheVue: View {
                 Button { NSWorkspace.shared.open(url) } label: { Label("Appeler", systemImage: "phone") }
             }
             if let url = brouillon.lienLinkedIn {
-                Button(brouillon.linkedin.isEmpty ? "Chercher sur LinkedIn" : "LinkedIn") { Safari.ouvrir(url) }
+                Button(brouillon.linkedin.isEmpty ? L("Chercher sur LinkedIn") : "LinkedIn") { Safari.ouvrir(url) }
             }
             if !brouillon.facebook.isEmpty, let url = brouillon.lienFacebook {
                 Button("Facebook") { NSWorkspace.shared.open(url) }
@@ -105,16 +105,16 @@ struct FicheVue: View {
         let retard = !date.isEmpty && date < Dates.aujourdhui()
         let couleur: Color = brouillon.nePlusContacter ? .texte3 : (retard ? .rouge : (date == Dates.aujourdhui() ? .ambre : .texte2))
         return VStack(alignment: .leading, spacing: 6) {
-            Text(brouillon.nePlusContacter ? "NE PLUS CONTACTER" : "PROCHAINE ACTION")
+            Text(brouillon.nePlusContacter ? L("NE PLUS CONTACTER") : L("PROCHAINE ACTION"))
                 .font(.petit.weight(.semibold)).tracking(0.6).foregroundStyle(couleur)
-            Text(brouillon.prochaineAction.isEmpty ? "Rien de prévu. Écrivez-la dans Suivi, plus bas." : brouillon.prochaineAction)
+            Text(brouillon.prochaineAction.isEmpty ? L("Rien de prévu. Écrivez-la dans Suivi, plus bas.") : brouillon.prochaineAction)
                 .font(.ligneForte)
                 .foregroundStyle(brouillon.prochaineAction.isEmpty ? Color.texte3 : Color.texte)
                 .lineLimit(6)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(brouillon.prochaineAction)
             HStack {
-                Text(date.isEmpty ? "Sans date" : (retard ? "En retard, prévu le \(Dates.court(date))" : "Pour le \(Dates.court(date))"))
+                Text(date.isEmpty ? L("Sans date") : (retard ? L("En retard, prévu le \(Dates.court(date))") : L("Pour le \(Dates.court(date))")))
                     .font(.secondaire).foregroundStyle(couleur)
                 Spacer()
                 if !brouillon.prochaineAction.isEmpty || !date.isEmpty {
@@ -123,7 +123,7 @@ struct FicheVue: View {
                 }
             }
             if let e = etat.echanges[brouillon.id] {
-                Text("Dernier échange : \(e.resume)").font(.petit).foregroundStyle(Color.texte3)
+                Text("Dernier échange : \(e.resumeAffiche)").font(.petit).foregroundStyle(Color.texte3)
             }
         }
         .padding(14)
@@ -145,9 +145,9 @@ struct FicheVue: View {
                     if let d = Dates.jour.date(from: brouillon.prochaineDate) {
                         DatePicker("", selection: Binding(get: { d }, set: { brouillon.prochaineDate = Dates.jour.string(from: $0) }),
                                    displayedComponents: .date)
-                            .labelsHidden().datePickerStyle(.field).environment(\.locale, Locale(identifier: "fr_FR"))
+                            .labelsHidden().datePickerStyle(.field).environment(\.locale, Loc.locale)
                     }
-                    Menu(brouillon.prochaineDate.isEmpty ? "Choisir une date" : "Changer") {
+                    Menu(brouillon.prochaineDate.isEmpty ? L("Choisir une date") : L("Changer")) {
                         Button("Aujourd'hui") { brouillon.prochaineDate = Dates.aujourdhui() }
                         Button("Demain") { brouillon.prochaineDate = Dates.dans(1) }
                         Button("Dans 3 jours") { brouillon.prochaineDate = Dates.dans(3) }
@@ -227,7 +227,7 @@ struct FicheVue: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
             if fil.isEmpty {
-                EtatVide(texte: "Rien encore avec ce contact.")
+                EtatVide(texte: L("Rien encore avec ce contact."))
             } else {
                 ForEach(Array(fil.enumerated()), id: \.element.id) { i, e in
                     LigneEvenement(evenement: e, contact: brouillon).padding(.horizontal, 14).padding(.vertical, 8)
@@ -242,19 +242,19 @@ struct FicheVue: View {
     private var mailsSection: some View {
         Groupe(titre: "Mails") {
             if brouillon.email.isEmpty {
-                EtatVide(texte: "Ajoutez son e-mail pour retrouver vos échanges dans Mail.")
+                EtatVide(texte: L("Ajoutez son e-mail pour retrouver vos échanges dans Mail."))
             } else {
                 switch etatMails {
                 case .attente:
                     Button("Chercher nos échanges dans Mail (4 derniers mois)") { Task { await chargerMails() } }
                         .buttonStyle(.link).padding(14)
                 case .enCours:
-                    EtatChargement(texte: "Recherche dans Mail…")
+                    EtatChargement(texte: L("Recherche dans Mail…"))
                 case .erreur(let e):
                     EtatErreur(texte: e) { Task { await chargerMails() } }
                 case .pret:
                     if mails.isEmpty {
-                        EtatVide(texte: "Aucun échange avec \(brouillon.email) ces 4 derniers mois.")
+                        EtatVide(texte: L("Aucun échange avec \(brouillon.email) ces 4 derniers mois."))
                     } else {
                         ForEach(mails) { m in
                             Button { Mail.ouvrir(m) } label: {
@@ -262,8 +262,8 @@ struct FicheVue: View {
                                     Image(systemName: m.envoye ? "arrow.up.right" : "arrow.down.left")
                                         .font(.petit).foregroundStyle(Color.texte3).frame(width: 14).padding(.top, 3)
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text(m.objet.isEmpty ? "Sans objet" : m.objet).font(.secondaire).foregroundStyle(Color.texte).lineLimit(1)
-                                        Text(m.envoye ? "Vous" : m.correspondant).font(.petit).foregroundStyle(Color.texte3)
+                                        Text(m.objet.isEmpty ? L("Sans objet") : m.objet).font(.secondaire).foregroundStyle(Color.texte).lineLimit(1)
+                                        Text(m.envoye ? L("Vous") : m.correspondant).font(.petit).foregroundStyle(Color.texte3)
                                     }
                                     Spacer()
                                     Text(Dates.court(Dates.jour.string(from: m.date))).font(.petit).foregroundStyle(Color.texte3)
@@ -294,21 +294,21 @@ struct FicheVue: View {
 
     // MARK: Petits morceaux
 
-    private func menu(_ titre: String, _ valeur: Binding<String>, _ options: [(String, String)]) -> some View {
+    private func menu(_ titre: LocalizedStringKey, _ valeur: Binding<String>, _ options: [(String, String)]) -> some View {
         Picker(titre, selection: valeur) {
             ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
         }
         .labelsHidden().fixedSize()
     }
 
-    private func texte(_ valeur: Binding<String>, _ exemple: String) -> some View {
+    private func texte(_ valeur: Binding<String>, _ exemple: LocalizedStringKey) -> some View {
         TextField("", text: valeur, prompt: Text(exemple)).textFieldStyle(.plain)
     }
 }
 
 /// Un groupe de la fiche : titre au-dessus, surface arrondie.
 struct Groupe<Contenu: View>: View {
-    let titre: String
+    let titre: LocalizedStringKey
     @ViewBuilder var contenu: Contenu
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -321,10 +321,10 @@ struct Groupe<Contenu: View>: View {
 
 /// Une ligne libellé / valeur d'un groupe.
 struct Champ<Valeur: View>: View {
-    let libelle: String
+    let libelle: LocalizedStringKey
     var dernier = false
     @ViewBuilder var valeur: Valeur
-    init(_ libelle: String, dernier: Bool = false, @ViewBuilder valeur: () -> Valeur) {
+    init(_ libelle: LocalizedStringKey, dernier: Bool = false, @ViewBuilder valeur: () -> Valeur) {
         self.libelle = libelle; self.dernier = dernier; self.valeur = valeur()
     }
     var body: some View {
@@ -349,9 +349,9 @@ struct LigneEvenement: View {
             HStack(spacing: 6) {
                 Image(systemName: symbole).font(.petit).foregroundStyle(Color.texte3)
                 Text(entete).font(.petit.weight(.medium)).foregroundStyle(Color.texte2)
-                if evenement.statut == "prepare" { Pastille(texte: "À envoyer", couleur: .ambre) }
-                if evenement.statut == "annule" { Pastille(texte: "Pas envoyé", couleur: .texte3) }
-                if evenement.statut == "echec" { Pastille(texte: "Échec", couleur: .rouge) }
+                if evenement.statut == "prepare" { Pastille(texte: L("À envoyer"), couleur: .ambre) }
+                if evenement.statut == "annule" { Pastille(texte: L("Pas envoyé"), couleur: .texte3) }
+                if evenement.statut == "echec" { Pastille(texte: L("Échec"), couleur: .rouge) }
                 Spacer()
                 Text(Dates.court(evenement.le)).font(.petit).foregroundStyle(Color.texte3)
             }
@@ -373,8 +373,8 @@ struct LigneEvenement: View {
     }
 
     private var entete: String {
-        let qui = evenement.statut == "prepare" || evenement.statut == "annule" ? "Préparé"
-            : (evenement.sens == "entrant" ? "Reçu" : (evenement.sens == "sortant" ? "Envoyé" : "Note"))
+        let qui = evenement.statut == "prepare" || evenement.statut == "annule" ? L("Préparé")
+            : (evenement.sens == "entrant" ? L("Reçu") : (evenement.sens == "sortant" ? L("Envoyé") : L("Note")))
         return "\(Libelles.typeEvenement(evenement.type)) · \(Libelles.canal(evenement.canal)) · \(qui) · \(evenement.par)"
     }
 

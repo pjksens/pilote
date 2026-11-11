@@ -15,7 +15,7 @@ struct FichePanneau: View {
             if let c = contact {
                 FicheVue(contact: c).id(c.id)
             } else {
-                EtatErreur(texte: "Fiche introuvable")
+                EtatErreur(texte: L("Fiche introuvable"))
                 Spacer()
             }
         }
@@ -27,7 +27,7 @@ struct FichePanneau: View {
         HStack(spacing: 10) {
             Image(systemName: "person.crop.circle.fill").foregroundStyle(Color.action)
             VStack(alignment: .leading, spacing: 1) {
-                Text(contact?.titre ?? "Fiche").font(.ligneForte).foregroundStyle(Color.texte).lineLimit(1)
+                Text(contact?.titre ?? L("Fiche")).font(.ligneForte).foregroundStyle(Color.texte).lineLimit(1)
                 if let s = contact?.sousTitre, !s.isEmpty {
                     Text(s).font(.petit).foregroundStyle(Color.texte3).lineLimit(1)
                 }

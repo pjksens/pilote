@@ -150,7 +150,7 @@ them. For each item, only write what you actually verified.
   <br><sub>데모 모드(<code>./scripts/demo.sh</code>): 가상의 데이터이며 실제 인물은 없습니다.</sub>
 </p>
 
-> 앱의 인터페이스와 코드 주석은 프랑스어로 되어 있습니다. 이 README는 9개 언어로 제공되지만, 앱은 (아직) 그렇지 않습니다.
+> 앱의 인터페이스는 Mac의 언어를 따릅니다: 영어, 프랑스어, 스페인어(그 외 언어는 영어). 코드 주석, 명령줄 도구 `pilote`, MCP 서버는 프랑스어로 유지됩니다. 이 README는 9개 언어로 제공됩니다.
 
 ## Pilote가 하는 일
 
@@ -160,6 +160,7 @@ them. For each item, only write what you actually verified.
 - **에이전트.** Mac에서 열려 있는 Claude Code 세션, 각 세션의 상태와 마지막 동작, 그리고 세션이 결과물로 낸 내용의 일지(Claude Code의 `Stop` 훅이 채웁니다).
 - **업무 지도.** 모든 프로젝트, 해당 폴더, `ETAT.md`(상태 파일), 핵심 문서. 프로젝트, 연락처, 일지, 파일(Spotlight)을 가로질러 전부 검색할 수 있습니다(⌘K).
 - **이메일은 사용자가 통제합니다.** 준비된 이메일은 사용자가 클릭할 때만, 사용자 본인의 Gmail에서 발송됩니다(SMTP, 앱 비밀번호는 macOS 키체인에 저장되며 Claude는 절대 읽지 않습니다). 일반 텍스트이며, 답장은 올바른 스레드에 이어집니다.
+- **Pip(선택).** [Pip](https://github.com/pjksens/heypip)(통화를 따라가는 Mac 노치 앱)이 설치되어 있으면, 캘린더의 화상 통화에 “Launch Pip” 버튼이 나타납니다. Pip은 통화 이름과 연결된 연락처와 함께 열립니다. 선택하면 Pilote가 2분 전에 알아서 열 수도 있습니다. Pip은 사용자가 직접 클릭한 뒤에만 녹음하며, Claude가 통화 요약을 쓰면 Pilote가 그것을 연락처의 기록에 보관합니다. 캘린더를 읽으므로 기본값이 꺼짐인 `rappels_calendrier`를 따릅니다.
 - **게시.** YouTube, Instagram, TikTok에 동영상 게시를 예약하며, 하나하나 올라가기 전에 명시적인 승인을 받습니다(토큰은 키체인에 저장).
 - **레이더.** 소셜 미디어 계정(조회수, 게시 주기, 아이디어)을 살펴봅니다. 직접 입력하거나 유료 데이터 소스로 가져올 수 있으며, 유료 소스는 사용자의 확인 없이는 실행되지 않습니다.
 
@@ -172,14 +173,14 @@ them. For each item, only write what you actually verified.
   <br><sub>세션이 지금 무엇을 하는지 확인하고, Pilote를 떠나지 않고 그중 하나에 메시지를 보낼 수 있습니다.</sub>
 </p>
 
-세션이 결정을 필요로 하면 그 질문이 선택 버튼과 함께 홈 화면에 나타납니다. 사용자의 답변은 **“Vos réponses, prêtes à partir”**(사용자의 답변, 발송 준비 완료)에 보관되며 **Envoyer**(보내기)를 클릭할 때까지 대기합니다. 어떤 것도 실수로 세션에 전달되지 않습니다.
+세션이 결정을 필요로 하면 그 질문이 선택 버튼과 함께 홈 화면에 나타납니다. 사용자의 답변은 **“Your replies, ready to go”**(사용자의 답변, 발송 준비 완료)에 보관되며 **Send**(보내기)를 클릭할 때까지 대기합니다. 어떤 것도 실수로 세션에 전달되지 않습니다.
 
 <p align="center">
   <img src="docs/media/facteur.gif" width="720" alt="홈 화면에 나타난 세션의 질문: 답변을 한 번 클릭하고 보내기">
   <br><sub>세션이 질문하면 한 번의 클릭으로 답하고, 언제 보낼지는 사용자가 정합니다.</sub>
 </p>
 
-> **답변이 세션에 전달되는 방식:** [`scripts/facteur.py`](scripts/facteur.py), 즉 “Facteur”(우편배달부)입니다. 홈 화면의 **Démarrer le Facteur** 버튼을 누르면 지침이 담긴 Claude Code 세션이 열립니다. 이 세션은 백그라운드에서 기다리다가 각 답변을 몇 초 안에 알맞은 세션에 전달합니다. 전달 대상은 질문한 세션 또는 사용자가 메시지를 쓴 세션이며, 없으면 `reglages.json`의 `facteur.sessions`에 지정한 세션, 그것도 없으면 `EQUIPE.md` 표에 있는 세션입니다. 코드에는 세션 ID가 전혀 적혀 있지 않습니다.
+> **답변이 세션에 전달되는 방식:** [`scripts/facteur.py`](scripts/facteur.py), 즉 “Facteur”(우편배달부)입니다. 홈 화면의 **Start Facteur** 버튼을 누르면 지침이 담긴 Claude Code 세션이 열립니다. 이 세션은 백그라운드에서 기다리다가 각 답변을 몇 초 안에 알맞은 세션에 전달합니다. 전달 대상은 질문한 세션 또는 사용자가 메시지를 쓴 세션이며, 없으면 `reglages.json`의 `facteur.sessions`에 지정한 세션, 그것도 없으면 `EQUIPE.md` 표에 있는 세션입니다. 코드에는 세션 ID가 전혀 적혀 있지 않습니다.
 
 ## 주의 사항
 
@@ -199,9 +200,9 @@ them. For each item, only write what you actually verified.
 
 | | |
 |---|---|
-| ![에이전트: Claude Code 세션과 그 일지](docs/captures/10-claude.png) | ![연락처: 주소록, 단계, 다음 행동](docs/captures/04-contacts.png) |
+| ![에이전트: Claude Code 세션과 그 일지](docs/captures/09-claude.png) | ![연락처: 주소록, 단계, 다음 행동](docs/captures/04-contacts.png) |
 | ![잠재 고객: 단계별 보드](docs/captures/03-prospects.png) | ![동영상: 한 주, 계정 두 개](docs/captures/05-semaine.png) |
-| ![작업: 카드를 끌어 날짜 변경](docs/captures/08-taches.png) | ![다크 모드의 홈 화면](docs/captures/01-aujourdhui-sombre.png) |
+| ![작업: 카드를 끌어 날짜 변경](docs/captures/07-taches.png) | ![다크 모드의 홈 화면](docs/captures/01-aujourdhui-sombre.png) |
 
 스크린샷의 모든 데이터는 가상입니다(이름, 회사, 프랑스의 가상 번호 대역 06 39 98 00 0x 전화번호, `.example` 주소).
 
@@ -272,7 +273,7 @@ from organisations o left join utilisateurs u on u.organisation_id = o.id;
 
 **키.** Pilote에는 가능한 한 적은 권한만 주세요. **이 뷰만 읽을 수 있는** 토큰이 좋습니다. 예를 들어 그 뷰에 `select` 권한만 가진 전용 Postgres 역할을 만드는 방식입니다(그 역할에 연결된 토큰을 얻는 방법은 사용 중인 데이터베이스의 문서를 참고하세요). **Supabase의 `service_role`(또는 “secret”) 키는 절대 사용하지 마세요.** 이 키는 행 수준 보안(row level security)을 우회하여 데이터베이스 전체를 읽고 쓸 수 있습니다. 뷰를 `anon` 역할이 읽을 수 있게 하는 것도 안 됩니다. “anon” 키는 사용자의 앱에서 공개되어 있기 때문입니다.
 
-**Stripe**(`stripe_cle`, 선택): “Subscriptions: Read” 권한 하나만 가진 **제한된 키**(`rk_…`)입니다. 체험 계정과 유료 계정을 구분하는 데 쓰이며, 이 키가 없으면 구독이 있는 계정은 “À vérifier”(확인 필요)로 표시됩니다.
+**Stripe**(`stripe_cle`, 선택): “Subscriptions: Read” 권한 하나만 가진 **제한된 키**(`rk_…`)입니다. 체험 계정과 유료 계정을 구분하는 데 쓰이며, 이 키가 없으면 구독이 있는 계정은 “To check”(확인 필요)로 표시됩니다.
 
 **카운터**(`compteur`, 선택): `dossier`에서 실행되는 사용자의 명령어로, `ACTIFS 7 / 10` 한 줄을 출력하고, 이어서 섹션 제목과 그 아래에 공백 두 칸으로 들여쓴 줄들을 출력합니다.
 

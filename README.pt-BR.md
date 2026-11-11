@@ -154,7 +154,7 @@ them. For each item, only write what you actually verified.
   <br><sub>Modo demo (<code>./scripts/demo.sh</code>): dados inventados, nenhuma pessoa real.</sub>
 </p>
 
-> A interface do app e os comentários do código estão em francês. Este README existe em nove idiomas; o app, ainda não.
+> A interface do app segue o idioma do seu Mac: inglês, francês ou espanhol (inglês para qualquer outro idioma). Os comentários do código, a ferramenta de linha de comando `pilote` e o servidor MCP continuam em francês. Este README existe em nove idiomas.
 
 ## O que o Pilote faz
 
@@ -172,6 +172,7 @@ them. For each item, only write what you actually verified.
   busque em tudo (⌘K) entre projetos, contatos, diário e arquivos (Spotlight).
 - **E-mail sob controle.** Um e-mail preparado só sai quando você clica, a partir do seu Gmail (SMTP, senha de app
   guardada no chaveiro do macOS, nunca lida pelo Claude). Texto simples, e as respostas ficam na conversa certa.
+- **Pip, opcional.** Se o [Pip](https://github.com/pjksens/heypip) (um app de notch para Mac que acompanha chamadas) estiver instalado, aparece um botão “Launch Pip” numa videochamada da sua agenda: o Pip abre com o nome da chamada e o contato vinculado. Opcionalmente, o Pilote o abre sozinho dois minutos antes. O Pip só grava depois do seu próprio clique e, quando o Claude escreve o resumo da chamada, o Pilote o arquiva no histórico do contato. Ele lê a sua agenda, então segue `rappels_calendrier`, desligado por padrão.
 - **Publicação.** Agende vídeos no YouTube, Instagram e TikTok, com uma aprovação explícita antes de cada um sair
   (tokens no chaveiro).
 - **Radar.** Acompanhe contas de redes sociais (visualizações, ritmo de postagem, ideias), inseridas à mão ou por meio
@@ -187,7 +188,7 @@ Suas sessões fazem o trabalho; o Pilote é onde você o vê e onde você respon
 </p>
 
 Quando uma sessão precisa de uma decisão, a pergunta dela aparece na tela inicial com seus botões. Sua resposta espera em
-**“Vos réponses, prêtes à partir”** (suas respostas, prontas para sair) até você clicar em **Envoyer** (enviar): nada
+**“Your replies, ready to go”** (suas respostas, prontas para sair) até você clicar em **Send** (enviar): nada
 chega a uma sessão por acidente.
 
 <p align="center">
@@ -196,7 +197,7 @@ chega a uma sessão por acidente.
 </p>
 
 > **Como suas respostas chegam às sessões:** [`scripts/facteur.py`](scripts/facteur.py), o “Facteur” (o carteiro).
-> O botão **Démarrer le Facteur** da tela inicial abre uma sessão do Claude Code com as instruções dele: ela espera em
+> O botão **Start Facteur** da tela inicial abre uma sessão do Claude Code com as instruções dele: ela espera em
 > segundo plano e entrega cada resposta à sessão certa em poucos segundos. É a sessão que fez a pergunta ou para a qual
 > você escreveu; se não, a indicada em `facteur.sessions` no `reglages.json`; se não, a da tabela do `EQUIPE.md`.
 > Nenhum identificador de sessão está escrito no código.
@@ -227,9 +228,9 @@ própria janela: sem permissão de gravação de tela.
 
 | | |
 |---|---|
-| ![Agentes: as sessões do Claude Code e o diário delas](docs/captures/10-claude.png) | ![Contatos: a agenda de contatos, a etapa e a próxima ação](docs/captures/04-contacts.png) |
+| ![Agentes: as sessões do Claude Code e o diário delas](docs/captures/09-claude.png) | ![Contatos: a agenda de contatos, a etapa e a próxima ação](docs/captures/04-contacts.png) |
 | ![Prospects: o quadro por etapa](docs/captures/03-prospects.png) | ![Vídeos: a semana, duas contas](docs/captures/05-semaine.png) |
-| ![Tarefas: arraste um cartão para mudar o dia dele](docs/captures/08-taches.png) | ![Tela inicial no modo escuro](docs/captures/01-aujourdhui-sombre.png) |
+| ![Tarefas: arraste um cartão para mudar o dia dele](docs/captures/07-taches.png) | ![Tela inicial no modo escuro](docs/captures/01-aujourdhui-sombre.png) |
 
 Todos os dados das capturas de tela são inventados (nomes, empresas, números de telefone na faixa de ficção francesa
 06 39 98 00 0x, endereços em `.example`).
@@ -317,7 +318,7 @@ inteiro, em leitura e escrita, ignorando a segurança em nível de linha. També
 `anon`: a chave “anon” é pública nos seus apps.
 
 **Stripe** (`stripe_cle`, opcional): uma **chave restrita** (`rk_…`) com a única permissão “Subscriptions: Read”. Ela
-distingue testes de contas pagantes; sem ela, uma conta com assinatura aparece como “À vérifier” (a verificar).
+distingue testes de contas pagantes; sem ela, uma conta com assinatura aparece como “To check” (a verificar).
 
 **Contador** (`compteur`, opcional): um comando seu, executado em `dossier`, que imprime uma linha `ACTIFS 7 / 10`, depois
 títulos de seção seguidos de linhas recuadas com dois espaços.

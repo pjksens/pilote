@@ -13,9 +13,9 @@ struct SessionClaude: Identifiable, Hashable {
 
     var libelleEtat: String {
         switch etat {
-        case "busy": return "Au travail"
-        case "waiting": return "Attend votre réponse"
-        case "idle": return "En pause"
+        case "busy": return L("Au travail")
+        case "waiting": return L("Attend votre réponse")
+        case "idle": return L("En pause")
         default: return ""
         }
     }
@@ -37,12 +37,13 @@ enum Claude {
     static let maison = Demo.maison
 
     /// Les dossiers proposés à l'ouverture d'une session : reglages.json (`dossiers_sessions`), sinon le dossier personnel.
+    /// Calculé : la langue se lit à l'appel.
     static var dossiers: [(String, String)] {
         let r = (Reglages.courants.dossiersSessions ?? []).map { ($0.nom, Reglages.url($0.chemin).path) }
-        return r.isEmpty ? [("Dossier personnel", maison.path)] : r
+        return r.isEmpty ? [(L("Dossier personnel"), maison.path)] : r
     }
 
-    /// Les routines lancées d'un clic : reglages.json (`routines`), aucune par défaut.
+    /// Les routines lancées d'un clic : reglages.json (`routines`), aucune par défaut. Titre et détail viennent de vos réglages.
     static var routines: [RoutineClaude] {
         (Reglages.courants.routines ?? []).map {
             RoutineClaude(id: $0.id, titre: $0.titre, detail: $0.detail ?? "", dossier: Reglages.url($0.dossier).path,
@@ -121,7 +122,7 @@ enum Claude {
               let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = o["sessionId"] as? String, (o["isArchived"] as? Bool) != true else { return nil }
         let ms = (o["lastActivityAt"] as? Double) ?? Double(o["lastActivityAt"] as? String ?? "") ?? 0
-        return SessionClaude(id: id, titre: (o["title"] as? String) ?? "Sans titre", dossier: (o["cwd"] as? String) ?? "",
+        return SessionClaude(id: id, titre: (o["title"] as? String) ?? L("Sans titre"), dossier: (o["cwd"] as? String) ?? "",
                              etat: "", derniereActivite: ms > 0 ? Date(timeIntervalSince1970: ms / 1000) : nil,
                              favorite: (o["isStarred"] as? Bool) ?? false)
     }

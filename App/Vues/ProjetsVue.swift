@@ -53,11 +53,11 @@ struct ProjetsVue: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack(spacing: 12) {
-                EnTete(titre: "Projets", detail: "\(etat.projets.filter { $0.statut != "archive" }.count) projets, où est quoi et qui y travaille")
+                EnTete(titre: L("Projets"), detail: L("\(etat.projets.filter { $0.statut != "archive" }.count) projets, où est quoi et qui y travaille"))
                 TextField("", text: $filtre, prompt: Text("Filtrer les projets"))
                     .textFieldStyle(.roundedBorder).frame(width: 220)
                 Toggle("Archivés", isOn: $archives).toggleStyle(.checkbox).font(.secondaire)
-                BoutonPrincipal(titre: "Nouveau projet", symbole: "plus") {
+                BoutonPrincipal(titre: L("Nouveau projet"), symbole: "plus") {
                     edition = Projet(id: "", espace: "kryva")
                 }
             }
@@ -84,7 +84,7 @@ struct LigneProjet: View {
             }
             Spacer(minLength: 4)
             if let d = dernier.flatMap({ Dates.date($0.le) }) {
-                Text(d.formatted(.relative(presentation: .named).locale(Locale(identifier: "fr_FR"))))
+                Text(d.formatted(.relative(presentation: .named).locale(Loc.locale)))
                     .font(.petit).foregroundStyle(Color.texte3).lineLimit(1)
             }
         }
@@ -115,7 +115,7 @@ struct FicheProjetVue: View {
                     if !projet.description.isEmpty {
                         Text(projet.description).font(.ligne).foregroundStyle(Color.texte2)
                     }
-                    Text(projet.dossier.isEmpty ? "Pas de dossier" : projet.dossier + (existe ? "" : " (introuvable)"))
+                    Text(projet.dossier.isEmpty ? L("Pas de dossier") : projet.dossier + (existe ? "" : " " + L("(introuvable)")))
                         .font(.secondaire.monospaced()).foregroundStyle(existe ? Color.texte3 : Color.rouge)
                         .textSelection(.enabled)
                 }
@@ -125,7 +125,7 @@ struct FicheProjetVue: View {
                 if !projet.listeDocuments.isEmpty { documents }
                 journal
                 if !projet.notes.isEmpty {
-                    Carte(titre: "Notes") {
+                    Carte(titre: L("Notes")) {
                         Text(projet.notes).font(.secondaire).foregroundStyle(Color.texte).textSelection(.enabled)
                             .padding(.horizontal, 16).padding(.bottom, 14).frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -165,12 +165,12 @@ struct FicheProjetVue: View {
     }
 
     private var carteEtat: some View {
-        Carte(titre: "Où en est le projet", detail: etatFichier == nil ? nil : "ETAT.md") {
+        Carte(titre: L("Où en est le projet"), detail: etatFichier == nil ? nil : "ETAT.md") {
             if let t = etatFichier {
                 Text(t).font(.secondaire).foregroundStyle(Color.texte).textSelection(.enabled)
                     .padding(.horizontal, 16).padding(.bottom, 14).frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                EtatVide(texte: "Pas encore d'ETAT.md dans ce dossier. Les sessions l'écrivent en fin de travail (fait, en cours, prochaine étape, fichiers clés).")
+                EtatVide(texte: L("Pas encore d'ETAT.md dans ce dossier. Les sessions l'écrivent en fin de travail (fait, en cours, prochaine étape, fichiers clés)."))
             }
         }
     }
@@ -179,7 +179,7 @@ struct FicheProjetVue: View {
         let actifs = etat.agents(dans: projet)
         let anciennes = sessions.filter { s in !actifs.contains { $0.sessionApp == s.id } }.prefix(5)
         if !actifs.isEmpty || !anciennes.isEmpty {
-            Carte(titre: "Sessions", detail: actifs.isEmpty ? nil : "\(actifs.count) ouverte\(actifs.count > 1 ? "s" : "")") {
+            Carte(titre: L("Sessions"), detail: actifs.isEmpty ? nil : L("\(actifs.count) ouvertes")) {
                 ForEach(actifs) { a in
                     LigneCarte(dernier: false) { LigneActivite(activite: a) }
                 }
@@ -193,7 +193,7 @@ struct FicheProjetVue: View {
     }
 
     private var documents: some View {
-        Carte(titre: "Documents clés") {
+        Carte(titre: L("Documents clés")) {
             let docs = projet.listeDocuments
             ForEach(Array(docs.enumerated()), id: \.offset) { i, d in
                 LigneCarte(dernier: i == docs.count - 1) {
@@ -205,9 +205,9 @@ struct FicheProjetVue: View {
 
     @ViewBuilder private var journal: some View {
         let entrees = etat.journal.filter { $0.projetId == projet.id }.prefix(15)
-        Carte(titre: "Journal", detail: entrees.isEmpty ? nil : "ce que les agents y ont fait") {
+        Carte(titre: L("Journal"), detail: entrees.isEmpty ? nil : L("ce que les agents y ont fait")) {
             if entrees.isEmpty {
-                EtatVide(texte: "Rien encore. Chaque fin de réponse d'une session dans ce dossier s'inscrira ici.")
+                EtatVide(texte: L("Rien encore. Chaque fin de réponse d'une session dans ce dossier s'inscrira ici."))
             } else {
                 ForEach(Array(entrees.enumerated()), id: \.element.id) { i, e in
                     LigneCarte(dernier: i == entrees.count - 1) { LigneJournal(entree: e, avecProjet: false) }

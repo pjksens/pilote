@@ -150,7 +150,7 @@ final class Agenda {
         do {
             try termine.rouvrir(planning(r))
             erreurPlanning = nil
-        } catch { erreurPlanning = "Pas remis à faire : \(error.localizedDescription)" }
+        } catch { erreurPlanning = L("Pas remis à faire : \(error.localizedDescription)") }
         terminees = termine.lire()
     }
 
@@ -159,12 +159,12 @@ final class Agenda {
         let cal = Calendar.current
         let predicat = store.predicateForEvents(withStart: cal.startOfDay(for: r.debut), end: r.fin.addingTimeInterval(1), calendars: nil)
         guard let e = store.events(matching: predicat).first(where: { $0.calendarItemIdentifier == r.id && $0.startDate == r.debut }) else {
-            erreurPlanning = "Ce rendez-vous n'existe plus dans Calendrier."
+            erreurPlanning = L("Ce rendez-vous n'existe plus dans Calendrier.")
             Task { await charger() }
             return
         }
         guard e.calendar?.allowsContentModifications != false else {
-            erreurPlanning = "Le calendrier « \(r.calendrier) » ne se modifie pas depuis Pilote : reportez-le dans Calendrier."
+            erreurPlanning = L("Le calendrier « \(r.calendrier) » ne se modifie pas depuis Pilote : reportez-le dans Calendrier.")
             return
         }
         let duree = e.endDate.timeIntervalSince(e.startDate)
@@ -173,7 +173,7 @@ final class Agenda {
         do {
             try store.save(e, span: .thisEvent, commit: true)
             erreurPlanning = nil
-        } catch { erreurPlanning = "Calendrier n'a pas accepté le report (\(error.localizedDescription))." }
+        } catch { erreurPlanning = L("Calendrier n'a pas accepté le report (\(error.localizedDescription)).") }
         Task { await charger() }
     }
 
@@ -242,13 +242,13 @@ final class Agenda {
     func terminer(_ t: TachePlanning) {
         if t.genre == .tache {
             guard let r = store.calendarItem(withIdentifier: t.idLocal) as? EKReminder else {
-                erreurPlanning = "Ce rappel n'existe plus dans Rappels. Rien n'est noté."
+                erreurPlanning = L("Ce rappel n'existe plus dans Rappels. Rien n'est noté.")
                 return
             }
             if !r.isCompleted {
                 r.isCompleted = true
                 do { try store.save(r, commit: true) } catch {
-                    erreurPlanning = "Rappels n'a pas accepté la coche. Rien n'est noté, PILOTE n'est pas prévenu."
+                    erreurPlanning = L("Rappels n'a pas accepté la coche. Rien n'est noté, PILOTE n'est pas prévenu.")
                     return
                 }
             }
@@ -257,7 +257,9 @@ final class Agenda {
             try termine.terminer(t)
             erreurPlanning = nil
         } catch {
-            erreurPlanning = (t.genre == .tache ? "Rappel coché, mais la" : "La") + " ligne pour PILOTE n'a pas pu être écrite (\(error.localizedDescription))."
+            erreurPlanning = t.genre == .tache
+                ? L("Rappel coché, mais la ligne pour PILOTE n'a pas pu être écrite (\(error.localizedDescription)).")
+                : L("La ligne pour PILOTE n'a pas pu être écrite (\(error.localizedDescription)).")
         }
         terminees = termine.lire()
         Task { await charger() }
@@ -268,7 +270,7 @@ final class Agenda {
     func terminer(rappel: Rappel) -> String? {
         guard let r = store.calendarItem(withIdentifier: rappel.id) as? EKReminder else {
             Task { await charger() }
-            return "Ce rappel n'existe plus dans Rappels. Rien n'est noté."
+            return L("Ce rappel n'existe plus dans Rappels. Rien n'est noté.")
         }
         if let t = Self.element(r) {
             terminer(t)
@@ -276,7 +278,7 @@ final class Agenda {
         }
         // Sans échéance (cas rare) : coché seulement.
         r.isCompleted = true
-        do { try store.save(r, commit: true) } catch { return "Rappels n'a pas accepté la coche." }
+        do { try store.save(r, commit: true) } catch { return L("Rappels n'a pas accepté la coche.") }
         rappels.removeAll { $0.id == rappel.id }
         Task { await charger() }
         return nil
@@ -286,19 +288,19 @@ final class Agenda {
     func supprimer(_ t: TachePlanning) {
         guard t.genre == .tache else { return }
         guard let r = store.calendarItem(withIdentifier: t.idLocal) as? EKReminder else {
-            erreurPlanning = "Ce rappel n'existe plus dans Rappels."
+            erreurPlanning = L("Ce rappel n'existe plus dans Rappels.")
             Task { await charger() }
             return
         }
         do { try store.remove(r, commit: true) } catch {
-            erreurPlanning = "Rappels n'a pas accepté la suppression (\(error.localizedDescription))."
+            erreurPlanning = L("Rappels n'a pas accepté la suppression (\(error.localizedDescription)).")
             return
         }
         do {
             try termine.ajouter(TachesTerminees.ligne(t, heure: Date(), classe: "tache_supprimee"))
             erreurPlanning = nil
         } catch {
-            erreurPlanning = "Rappel supprimé, mais la ligne pour PILOTE n'a pas pu être écrite (\(error.localizedDescription))."
+            erreurPlanning = L("Rappel supprimé, mais la ligne pour PILOTE n'a pas pu être écrite (\(error.localizedDescription)).")
         }
         Task { await charger() }
     }
@@ -448,7 +450,7 @@ final class Agenda {
             try store.save(r, commit: true)
             erreur = nil
         } catch {
-            erreur = "Rappels n'a pas accepté la modification."
+            erreur = L("Rappels n'a pas accepté la modification.")
         }
         Task { await charger() }
     }
@@ -462,7 +464,7 @@ final class Agenda {
             rappels.removeAll { $0.id == rappel.id }
             decisionsAVenir.removeAll { $0.id == rappel.id }
         } catch {
-            erreur = "Le rappel n'a pas pu être coché."
+            erreur = L("Le rappel n'a pas pu être coché.")
         }
     }
 
@@ -479,7 +481,7 @@ final class Agenda {
             rappels.removeAll { $0.id == rappel.id }
             decisionsAVenir.removeAll { $0.id == rappel.id }
         } catch {
-            erreur = "La décision n'a pas pu être notée dans Rappels."
+            erreur = L("La décision n'a pas pu être notée dans Rappels.")
         }
     }
 

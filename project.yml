@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: io.github.pjksens
   deploymentTarget:
     macOS: "15.0"
+  developmentLanguage: en        # repli de la langue pour tout Mac qui n'est ni français, ni anglais, ni espagnol
   createIntermediateGroups: true
 settings:
   base:
@@ -32,6 +33,8 @@ targets:
         INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Pilote affiche vos rendez-vous du jour."
         INFOPLIST_KEY_NSAppleEventsUsageDescription: "Pilote lit vos échanges avec vos contacts dans Mail et y prépare des brouillons. Il n'envoie jamais rien."
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: YES                       # le compilateur relève les textes dans App/Localizable.xcstrings
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
   pilote:
     type: tool
@@ -44,7 +47,10 @@ targets:
   PiloteTests:
     type: bundle.unit-test
     platform: macOS
-    sources: [Tests, Shared]
+    sources:
+      - Tests
+      - Shared
+      - App/Localizable.xcstrings      # les tests lisent le catalogue compilé (langue réglée par Loc)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.pjksens.pilote.tests

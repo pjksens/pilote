@@ -26,6 +26,13 @@ struct Contact: Identifiable, Hashable, Codable {
     var creeLe: String = ""
     var majLe: String = ""
 
+    /// 09/11 (Organisation) : le nom montré sur une ligne, jamais vide. Sans nom : l'entreprise, sinon le téléphone,
+    /// l'e-mail ou le site.
+    var nomAffiche: String {
+        [nom, entreprise, telephone, email, site].lazy.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? L("Contact sans nom")
+    }
+
     /// Ordre par défaut de la liste : d'abord ce qui demande une action, puis les échanges en cours,
     /// les inscrits KRYVA, les prochaines actions sans date, les priorités hautes, le reste.
     var importance: Int {
@@ -73,7 +80,7 @@ struct Contact: Identifiable, Hashable, Codable {
     }
 
     /// Nom à afficher : la personne, sinon l'entreprise.
-    var titre: String { nom.isEmpty ? (entreprise.isEmpty ? "Sans nom" : entreprise) : nom }
+    var titre: String { nom.isEmpty ? (entreprise.isEmpty ? L("Sans nom") : entreprise) : nom }
     var sousTitre: String { nom.isEmpty ? "" : entreprise }
 }
 
@@ -104,23 +111,43 @@ struct Evenement: Identifiable, Hashable, Codable {
 }
 
 enum Libelles {
-    static var espaces: [(String, String)] { Reglages.nommer([("kryva", "KRYVA"), ("freelance", "Freelance"), ("autre", "Autre")]) }
-    static let types: [(String, String)] = [
-        ("artisan", "Artisan"), ("comptable", "Comptable"), ("partenaire", "Partenaire"),
-        ("negoce", "Négoce"), ("syndicat", "Syndicat"), ("client", "Client"), ("autre", "Autre"),
-    ]
-    static let etapes: [(String, String)] = [
+    // 10/11 (langues) : les libellés se lisent à l'appel (var calculées), pas une fois pour toutes ; les clés (« kryva »,
+    // « a_contacter »…) sont les valeurs stockées et ne changent jamais.
+    static var espaces: [(String, String)] { Reglages.nommer([("kryva", "KRYVA"), ("freelance", "Freelance"), ("autre", L("Autre"))]) }
+    static var types: [(String, String)] { [
+        ("artisan", L("Artisan")), ("comptable", L("Comptable")), ("partenaire", L("Partenaire")),
+        ("negoce", L("Négoce")), ("syndicat", L("Syndicat")), ("client", L("Client")), ("autre", L("Autre")),
+    ] }
+    static var etapes: [(String, String)] { [
+        ("a_contacter", L("À contacter")), ("contacte", L("Contacté")), ("repondu", L("A répondu")),
+        ("rdv", L("Rendez-vous")), ("gagne", L("Gagné")), ("perdu", L("Perdu")),
+    ] }
+    static var canaux: [(String, String)] { [
+        ("linkedin", "LinkedIn"), ("facebook", "Facebook"), ("instagram", "Instagram"), ("sms", "SMS"), ("mail", "Mail"),
+        ("appel", L("Appel")), ("visite", L("Visite")), ("visio", L("Visio")), ("autre", L("Autre")),
+    ] }
+    static var typesEvenement: [(String, String)] { [
+        ("invitation", L("Invitation")), ("message", L("Message")), ("reponse", L("Réponse")), ("appel", L("Appel")),
+        ("visite", L("Visite")), ("rdv", L("Rendez-vous")), ("note", L("Note")),
+    ] }
+
+    // Les mêmes libellés, toujours en français : pour ce qu'on écrit dans la base (notes du fil) ou qu'on envoie à une
+    // session (les équipes d'agents travaillent en français). Jamais pour l'écran.
+    private static let etapesFr: [(String, String)] = [
         ("a_contacter", "À contacter"), ("contacte", "Contacté"), ("repondu", "A répondu"),
         ("rdv", "Rendez-vous"), ("gagne", "Gagné"), ("perdu", "Perdu"),
     ]
-    static let canaux: [(String, String)] = [
+    private static let canauxFr: [(String, String)] = [
         ("linkedin", "LinkedIn"), ("facebook", "Facebook"), ("instagram", "Instagram"), ("sms", "SMS"), ("mail", "Mail"),
         ("appel", "Appel"), ("visite", "Visite"), ("visio", "Visio"), ("autre", "Autre"),
     ]
-    static let typesEvenement: [(String, String)] = [
+    private static let typesEvenementFr: [(String, String)] = [
         ("invitation", "Invitation"), ("message", "Message"), ("reponse", "Réponse"), ("appel", "Appel"),
         ("visite", "Visite"), ("rdv", "Rendez-vous"), ("note", "Note"),
     ]
+    static func etapeFr(_ c: String) -> String { libelle(etapesFr, c) }
+    static func canalFr(_ c: String) -> String { libelle(canauxFr, c) }
+    static func typeEvenementFr(_ c: String) -> String { libelle(typesEvenementFr, c) }
 
     static func libelle(_ liste: [(String, String)], _ cle: String) -> String {
         liste.first { $0.0 == cle }?.1 ?? cle
@@ -157,7 +184,7 @@ enum Libelles {
     }
 
     /// Ordre des étapes : on ne fait jamais reculer un contact automatiquement.
-    static func rang(_ etape: String) -> Int { etapes.firstIndex { $0.0 == etape } ?? 0 }
+    static func rang(_ etape: String) -> Int { etapesFr.firstIndex { $0.0 == etape } ?? 0 }
 }
 
 enum Dates {
@@ -224,10 +251,11 @@ enum Dates {
         return p.count == 3 ? "\(p[2])/\(p[1])" : s
     }
 
-    static func court(_ s: String) -> String {
+    /// `francais` : pour une note écrite dans la base (toujours en français) ; sinon la langue de l'app.
+    static func court(_ s: String, francais: Bool = false) -> String {
         guard let d = date(s) else { return s }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = (francais || Loc.estFrancais) ? Locale(identifier: "fr_FR") : Loc.locale
         f.timeZone = TimeZone(identifier: "Europe/Paris")
         let memeAnnee = Calendar.current.component(.year, from: d) == Calendar.current.component(.year, from: Date())
         f.setLocalizedDateFormatFromTemplate(memeAnnee ? "d MMM" : "d MMM y")
@@ -237,5 +265,21 @@ enum Dates {
     static func date(_ s: String) -> Date? {
         if s.isEmpty { return nil }
         return iso.date(from: s) ?? jour.date(from: String(s.prefix(10)))
+    }
+}
+
+extension DernierEchange {
+    /// Le dernier échange en une phrase, dans la langue de l'app (`resume`, dans Videos.swift, reste en français).
+    /// Une phrase entière par cas : l'ordre des mots change d'une langue à l'autre.
+    var resumeAffiche: String {
+        let quand = Dates.court(le)
+        let canal = Libelles.canal(self.canal)
+        switch sens {
+        case "entrant": return L("A répondu (\(canal)) le \(quand)")
+        case "sortant":
+            if self.canal == "autre" { return L("\(Libelles.typeEvenement(type)) envoyé le \(quand)") }
+            return L("\(canal) envoyé le \(quand)")
+        default: return L("\(Libelles.typeEvenement(type)) le \(quand)")
+        }
     }
 }

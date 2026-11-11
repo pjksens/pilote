@@ -73,18 +73,18 @@ struct RechercheVue: View {
                         Text("Tapez deux lettres pour chercher un projet, un contact, un fichier ou ce qu'un agent a fait.")
                             .font(.petit).foregroundStyle(Color.texte3)
                     } else if vide && cherche {
-                        EtatChargement(texte: "Recherche dans les projets, les contacts, le journal et les fichiers…")
+                        EtatChargement(texte: L("Recherche dans les projets, les contacts, le journal et les fichiers…"))
                     } else if vide {
-                        EtatVide(texte: "Rien trouvé pour « \(texte) ».")
+                        EtatVide(texte: L("Rien trouvé pour « \(texte) »."))
                     }
                     if ouvreRadar || !radarTrouve.isEmpty {
                         section("Radar") {
                             if ouvreRadar {
-                                ligne(titre: "Ouvrir le Radar", detail: "pistes du moment, classement par ratio, boîte à idées (⇧⌘R)",
+                                ligne(titre: L("Ouvrir le Radar"), detail: L("pistes du moment, classement par ratio, boîte à idées (⇧⌘R)"),
                                       symbole: "dot.radiowaves.left.and.right") { ouvrirRadar() }
                             }
                             ForEach(radarTrouve) { l in
-                                ligne(titre: "@\(l.createur) · \(l.ratio.map { "×" + decimal($0) } ?? "ratio indéterminé")",
+                                ligne(titre: "@\(l.createur) · \(l.ratio.map { "×" + decimal($0) } ?? L("ratio indéterminé"))",
                                       detail: l.legende.isEmpty ? l.url : l.legende, symbole: "dot.radiowaves.left.and.right") { ouvrirRadar() }
                             }
                         }
@@ -153,7 +153,7 @@ struct RechercheVue: View {
         else if let e = pages.first { ouvrir(e) }
     }
 
-    private func section<C: View>(_ titre: String, @ViewBuilder _ contenu: () -> C) -> some View {
+    private func section<C: View>(_ titre: LocalizedStringKey, @ViewBuilder _ contenu: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(titre).font(.petit.weight(.semibold)).foregroundStyle(Color.texte3).padding(.bottom, 4)
             contenu()

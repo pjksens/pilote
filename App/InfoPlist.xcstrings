@@ -1,0 +1,72 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "NSAppleEventsUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote reads your conversations with your contacts in Mail and prepares drafts there. It never sends anything."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote lee tus conversaciones con tus contactos en Mail y prepara borradores allí. Nunca envía nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote lit vos échanges avec vos contacts dans Mail et y prépare des brouillons. Il n'envoie jamais rien."
+          }
+        }
+      }
+    },
+    "NSCalendarsFullAccessUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote shows your appointments for the day."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote muestra tus citas del día."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote affiche vos rendez-vous du jour."
+          }
+        }
+      }
+    },
+    "NSRemindersFullAccessUsageDescription" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote shows your reminders for the day and lets you check them off."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote muestra tus recordatorios del día y te permite marcarlos como hechos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pilote affiche vos rappels du jour et vous permet de les cocher."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}

@@ -1,0 +1,102 @@
+{
+  "Aucun dépôt suivi : à régler dans reglages.json (depot_suivi).": {
+    "en": "No tracked repository: set one in reglages.json (depot_suivi).",
+    "es": "Ningún repositorio seguido: configúralo en reglages.json (depot_suivi)."
+  },
+  "Aucune routine : ajoutez les vôtres dans reglages.json (routines).": {
+    "en": "No routines: add yours in reglages.json (routines).",
+    "es": "Sin rutinas: añade las tuyas en reglages.json (routines)."
+  },
+  "Calendrier et Rappels coupés : à activer dans reglages.json (rappels_calendrier).": {
+    "en": "Calendar and Reminders are off: turn them on in reglages.json (rappels_calendrier).",
+    "es": "Calendario y Recordatorios desactivados: actívalos en reglages.json (rappels_calendrier)."
+  },
+  "Compte sans abonnement en cours (Stripe et stores).": {
+    "en": "Account with no current subscription (Stripe and stores).",
+    "es": "Cuenta sin suscripción en curso (Stripe y tiendas)."
+  },
+  "Des artisans payants sur KRYVA": {
+    "en": "Paying tradespeople on KRYVA",
+    "es": "Artesanos de pago en KRYVA"
+  },
+  "Dossier personnel": {
+    "en": "Home folder",
+    "es": "Carpeta personal"
+  },
+  "En chiffres": {
+    "en": "In numbers",
+    "es": "En cifras"
+  },
+  "Envoi refusé : l'expéditeur %@ est dans un domaine interdit (reglages.json, domaines_interdits).": {
+    "en": "Send refused: the sender %@ is in a blocked domain (reglages.json, domaines_interdits).",
+    "es": "Envío rechazado: el remitente %@ está en un dominio prohibido (reglages.json, domaines_interdits)."
+  },
+  "La base des comptes n'a pas répondu.": {
+    "en": "The accounts database did not answer.",
+    "es": "La base de cuentas no ha respondido."
+  },
+  "Le dépôt suivi n'a pas pu être lu.": {
+    "en": "The tracked repository could not be read.",
+    "es": "No se ha podido leer el repositorio seguido."
+  },
+  "Le trousseau du Mac demande une autorisation pour l'outil pilote : sur le Mac, lancer une fois « %@/pilote gmail-acces » et cliquer « Toujours autoriser ». Rien n'est parti.": {
+    "en": "The Mac keychain is asking for permission for the pilote tool: on the Mac, run “%@/pilote gmail-acces” once and click “Always Allow”. Nothing was sent.",
+    "es": "El llavero del Mac pide autorización para la herramienta pilote: en el Mac, ejecuta una vez «%@/pilote gmail-acces» y pulsa «Permitir siempre». No se ha enviado nada."
+  },
+  "Lecture de la base des comptes…": {
+    "en": "Reading the accounts database…",
+    "es": "Leyendo la base de cuentas…"
+  },
+  "MAIL PARTI D'UN DOMAINE INTERDIT %lld": {
+    "en": "EMAIL SENT FROM A BLOCKED DOMAIN %lld",
+    "es": "CORREO ENVIADO DESDE UN DOMINIO PROHIBIDO %lld"
+  },
+  "Ouvre une session Claude avec votre première routine (reglages.json). Rien ne part sans vous.": {
+    "en": "Opens a Claude session with your first routine (reglages.json). Nothing goes out without you.",
+    "es": "Abre una sesión de Claude con tu primera rutina (reglages.json). Nada sale sin ti."
+  },
+  "Pilote envoie vos mails depuis votre Gmail perso, jamais depuis un domaine que vous avez interdit (reglages.json). Il lui faut un mot de passe d'application, créé par vous chez Google. Il reste dans le trousseau de ce Mac.": {
+    "en": "Pilote sends your emails from your own Gmail, never from a domain you have blocked (reglages.json). It needs an app password, created by you at Google. It stays in this Mac’s keychain.",
+    "es": "Pilote envía tus correos desde tu Gmail personal, nunca desde un dominio que hayas prohibido (reglages.json). Necesita una contraseña de aplicación, creada por ti en Google. Se queda en el llavero de este Mac."
+  },
+  "Rappels coupés : à activer dans reglages.json (rappels_calendrier).": {
+    "en": "Reminders are off: turn them on in reglages.json (rappels_calendrier).",
+    "es": "Recordatorios desactivados: actívalos en reglages.json (rappels_calendrier)."
+  },
+  "Statuts des comptes non lus : %@": {
+    "en": "Account statuses could not be read: %@",
+    "es": "No se han podido leer los estados de las cuentas: %@"
+  },
+  "Statuts des comptes, relus toutes les 5 minutes (module comptes et Stripe, lecture seule).": {
+    "en": "Account statuses, reread every 5 minutes (accounts module and Stripe, read-only).",
+    "es": "Estados de las cuentas, releídos cada 5 minutos (módulo de cuentas y Stripe, solo lectura)."
+  },
+  "Toutes visites du lien suivi": {
+    "en": "All visits to the tracked link",
+    "es": "Todas las visitas al enlace seguido"
+  },
+  "Tâche pour les clients KRYVA": {
+    "en": "Task for KRYVA customers",
+    "es": "Tarea para los clientes de KRYVA"
+  },
+  "actif sur %lld": {
+    "en": "active out of %lld",
+    "es": "activo de %lld"
+  },
+  "actifs sur %lld": {
+    "en": "active out of %lld",
+    "es": "activos de %lld"
+  },
+  "destinataire dans un domaine interdit (%@) : refusé": {
+    "en": "recipient in a blocked domain (%@): refused",
+    "es": "destinatario en un dominio prohibido (%@): rechazado"
+  },
+  "expéditeur dans un domaine interdit (%@) : jamais d'envoi depuis ce domaine": {
+    "en": "sender in a blocked domain (%@): never send from this domain",
+    "es": "remitente en un dominio prohibido (%@): nunca se envía desde ese dominio"
+  },
+  "objectif : %lld actifs": {
+    "en": "goal: %lld active",
+    "es": "objetivo: %lld activos"
+  }
+}

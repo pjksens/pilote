@@ -154,7 +154,7 @@ them. For each item, only write what you actually verified.
   <br><sub>Modalità demo (<code>./scripts/demo.sh</code>): dati inventati, nessuna persona reale.</sub>
 </p>
 
-> L'interfaccia dell'app e i commenti del suo codice sono in francese. Questo README esiste in nove lingue; l'app, per ora, no.
+> L'interfaccia dell'app segue la lingua del tuo Mac: inglese, francese o spagnolo (inglese per qualsiasi altra lingua). I commenti del codice, lo strumento da riga di comando `pilote` e il server MCP restano in francese. Questo README esiste in nove lingue.
 
 ## Cosa fa Pilote
 
@@ -172,6 +172,7 @@ them. For each item, only write what you actually verified.
   chiave; cerca in tutto (⌘K) tra progetti, contatti, diario e file (Spotlight).
 - **E-mail sotto controllo.** Un'e-mail preparata parte solo quando fai clic, dal tuo Gmail (SMTP, password per app
   conservata nel portachiavi di macOS, mai letta da Claude). Testo semplice, e le risposte restano nel thread giusto.
+- **Pip, facoltativo.** Se [Pip](https://github.com/pjksens/heypip) (un'app per il notch del Mac che segue le chiamate) è installata, su una videochiamata del tuo calendario compare un pulsante “Launch Pip”: Pip si apre con il nome della chiamata e il contatto collegato. In via facoltativa Pilote lo apre da solo due minuti prima. Pip registra solo dopo un tuo clic e, quando Claude ha scritto il riassunto della chiamata, Pilote lo archivia nella cronologia del contatto. Legge il tuo calendario, quindi segue `rappels_calendrier`, disattivato per impostazione predefinita.
 - **Pubblicazione.** Programma video su YouTube, Instagram e TikTok, con un'approvazione esplicita prima che ciascuno
   esca (token nel portachiavi).
 - **Radar.** Tieni d'occhio account di social media (visualizzazioni, ritmo di pubblicazione, idee), inseriti a mano o
@@ -187,8 +188,8 @@ Le tue sessioni fanno il lavoro; Pilote è il posto dove lo vedi e dove rispondi
 </p>
 
 Quando una sessione ha bisogno di una decisione, la sua domanda compare nella schermata iniziale con i suoi pulsanti. La
-tua risposta aspetta in **“Vos réponses, prêtes à partir”** (le tue risposte, pronte a partire) finché non fai clic su
-**Envoyer** (invia): niente arriva a una sessione per caso.
+tua risposta aspetta in **“Your replies, ready to go”** (le tue risposte, pronte a partire) finché non fai clic su
+**Send** (invia): niente arriva a una sessione per caso.
 
 <p align="center">
   <img src="docs/media/facteur.gif" width="720" alt="La domanda di una sessione nella schermata iniziale: un clic su una risposta, poi Invia">
@@ -196,7 +197,7 @@ tua risposta aspetta in **“Vos réponses, prêtes à partir”** (le tue rispo
 </p>
 
 > **Come le tue risposte arrivano alle sessioni:** [`scripts/facteur.py`](scripts/facteur.py), il “Facteur” (il postino).
-> Il pulsante **Démarrer le Facteur** nella schermata iniziale apre una sessione di Claude Code con le sue istruzioni:
+> Il pulsante **Start Facteur** nella schermata iniziale apre una sessione di Claude Code con le sue istruzioni:
 > resta in attesa in background e consegna ogni risposta alla sessione giusta in pochi secondi. È la sessione che ha fatto
 > la domanda o a cui hai scritto; altrimenti quella indicata in `facteur.sessions` di `reglages.json`; altrimenti quella
 > della tabella di `EQUIPE.md`. Nessun identificativo di sessione è scritto nel codice.
@@ -227,9 +228,9 @@ permesso di registrazione dello schermo.
 
 | | |
 |---|---|
-| ![Agenti: le sessioni di Claude Code e il loro diario](docs/captures/10-claude.png) | ![Contatti: la rubrica, la fase e la prossima azione](docs/captures/04-contacts.png) |
+| ![Agenti: le sessioni di Claude Code e il loro diario](docs/captures/09-claude.png) | ![Contatti: la rubrica, la fase e la prossima azione](docs/captures/04-contacts.png) |
 | ![Prospect: la bacheca per fase](docs/captures/03-prospects.png) | ![Video: la settimana, due account](docs/captures/05-semaine.png) |
-| ![Attività: trascina una scheda per cambiarne il giorno](docs/captures/08-taches.png) | ![Schermata iniziale in modalità scura](docs/captures/01-aujourdhui-sombre.png) |
+| ![Attività: trascina una scheda per cambiarne il giorno](docs/captures/07-taches.png) | ![Schermata iniziale in modalità scura](docs/captures/01-aujourdhui-sombre.png) |
 
 Ogni dato negli screenshot è inventato (nomi, aziende, numeri di telefono nell'intervallo di finzione francese
 06 39 98 00 0x, indirizzi in `.example`).
@@ -318,7 +319,7 @@ database, in lettura e scrittura, aggirando la row level security. Non rendere l
 
 **Stripe** (`stripe_cle`, facoltativo): una **chiave con restrizioni** (`rk_…`) con la sola autorizzazione
 “Subscriptions: Read”. Distingue le prove dagli account paganti; senza di essa, un account con un abbonamento compare
-come “À vérifier” (da verificare).
+come “To check” (da verificare).
 
 **Contatore** (`compteur`, facoltativo): un tuo comando, eseguito in `dossier`, che stampa una riga `ACTIFS 7 / 10`, poi
 titoli di sezione seguiti da righe rientrate di due spazi.

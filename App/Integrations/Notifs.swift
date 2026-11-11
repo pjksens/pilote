@@ -37,13 +37,12 @@ enum Notifs {
         defauts.set(vues, forKey: cleVues)
         if premiere {
             if !nouvelles.isEmpty {
-                envoyer(titre: "Pilote", corps: nouvelles.count == 1 ? "1 décision à prendre" : "\(nouvelles.count) décisions à prendre",
-                        id: "stock")
+                envoyer(titre: "Pilote", corps: L("\(nouvelles.count) décisions à prendre"), id: "stock")
             }
         } else if nouvelles.count <= 2 {
             for a in nouvelles { envoyer(titre: a.titre, corps: a.corps, id: a.cle) }
         } else {
-            envoyer(titre: "\(nouvelles.count) décisions à prendre",
+            envoyer(titre: L("\(nouvelles.count) décisions à prendre"),
                     corps: nouvelles.prefix(3).map(\.corps).joined(separator: " · "), id: "lot-\(Date().timeIntervalSince1970)")
         }
     }

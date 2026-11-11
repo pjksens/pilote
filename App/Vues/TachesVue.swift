@@ -8,11 +8,11 @@ enum Colonne: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var titre: String {
         switch self {
-        case .aujourdhui: return "Aujourd'hui"
-        case .demain: return "Demain"
-        case .semaine: return "Cette semaine"
-        case .plusTard: return "Plus tard"
-        case .fait: return "Fait"
+        case .aujourdhui: return L("Aujourd'hui")
+        case .demain: return L("Demain")
+        case .semaine: return L("Cette semaine")
+        case .plusTard: return L("Plus tard")
+        case .fait: return L("Fait")
         }
     }
 }
@@ -53,6 +53,7 @@ enum Jours {
 
     static func heure(_ d: Date) -> String {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "HH:mm"
         return f.string(from: d)
     }
@@ -120,16 +121,16 @@ struct TachesVue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                EnTete(titre: "Tâches", detail: "Glissez une carte pour changer son jour, ou clic droit. Le rond la coche.")
+                EnTete(titre: L("Tâches"), detail: L("Glissez une carte pour changer son jour, ou clic droit. Le rond la coche."))
                 if let erreur = agenda.erreur { EtatErreur(texte: erreur).background(Color.surface, in: RoundedRectangle(cornerRadius: 12)) }
             }
             .padding(.horizontal, 28).padding(.top, 28).padding(.bottom, 16)
             switch agenda.accesRappels {
             case .refuse:
-                EtatErreur(texte: "Pilote n'a pas accès à Rappels. Réglages Système › Confidentialité › Rappels.").padding(.horizontal, 28)
+                EtatErreur(texte: L("Pilote n'a pas accès à Rappels. Réglages Système › Confidentialité › Rappels.")).padding(.horizontal, 28)
                 Spacer()
             case .inconnu:
-                EtatChargement(texte: "Lecture de vos rappels…").padding(.horizontal, 28)
+                EtatChargement(texte: L("Lecture de vos rappels…")).padding(.horizontal, 28)
                 Spacer()
             case .coupe:
                 EtatVide(texte: "Rappels coupés : à activer dans reglages.json (rappels_calendrier).").padding(.horizontal, 28)
@@ -154,7 +155,7 @@ struct TachesVue: View {
                 .help("Quelles cartes afficher")
             }
             ToolbarItem(placement: .primaryAction) {
-                BoutonPrincipal(titre: "Nouvelle tâche", symbole: "plus") { feuille = true }
+                BoutonPrincipal(titre: L("Nouvelle tâche"), symbole: "plus") { feuille = true }
             }
         }
         .sheet(isPresented: $feuille) { NouvelleTache(listeParDefaut: agenda.listes.contains("KRYVA") ? "KRYVA" : (agenda.listes.first ?? "")) }
@@ -169,15 +170,12 @@ struct ColonneVue: View {
     @State private var cible = false
 
     private var sousTitre: String? {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateFormat = "EEE d MMM"
         switch colonne {
-        case .aujourdhui: return f.string(from: Jours.aujourdhui)
-        case .demain: return f.string(from: Jours.demain)
-        case .semaine: return "jusqu'à \(f.string(from: Jours.finSemaine))"
-        case .plusTard: return "et sans date"
-        case .fait: return "hier et aujourd'hui"
+        case .aujourdhui: return Loc.date(Jours.aujourdhui, "EEEdMMM")
+        case .demain: return Loc.date(Jours.demain, "EEEdMMM")
+        case .semaine: return L("jusqu'à \(Loc.date(Jours.finSemaine, "EEEdMMM"))")
+        case .plusTard: return L("et sans date")
+        case .fait: return L("hier et aujourd'hui")
         }
     }
 
@@ -329,13 +327,13 @@ struct CarteVue: View {
             let premiere = t.notes.split(separator: "\n").first.map(String.init) ?? ""
             return premiere.hasPrefix("http") ? "" : premiere
         case .contact(let c):
-            return c.prochaineAction.isEmpty ? "Prochaine action à préciser" : c.prochaineAction
+            return c.prochaineAction.isEmpty ? L("Prochaine action à préciser") : c.prochaineAction
         }
     }
 
     private var etiquette: String {
         switch carte {
-        case .rappel(let t): return t.liste + (t.recurrente ? " · se répète" : "")
+        case .rappel(let t): return t.recurrente ? L("\(t.liste) · se répète") : t.liste
         case .contact(let c): return c.entreprise.isEmpty ? Libelles.espace(c.espace) : c.entrepriseCourte
         }
     }
@@ -347,13 +345,13 @@ struct CarteVue: View {
 
     private var quand: String {
         if case .rappel(let t) = carte, t.faite, let f = t.faiteLe {
-            return "Fait " + f.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "fr_FR")))
+            return L("Fait \(f.formatted(.dateTime.weekday(.abbreviated).locale(Loc.locale)))")
         }
         guard let d = carte.echeance else { return "" }
-        let fr = Locale(identifier: "fr_FR")
+        let fr = Loc.locale
         var morceaux: [String] = []
         if enRetard {
-            morceaux.append("En retard · " + d.formatted(.dateTime.day().month(.abbreviated).locale(fr)))
+            morceaux.append(L("En retard · \(d.formatted(.dateTime.day().month(.abbreviated).locale(fr)))"))
         } else if colonne == .semaine || colonne == .plusTard {
             morceaux.append(d.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(fr)))
         }
@@ -384,7 +382,7 @@ struct DetailTache: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(tache.titre).font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.texte)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(tache.liste + (tache.recurrente ? " · se répète" : "")).font(.secondaire).foregroundStyle(Color.texte2)
+            Text(tache.recurrente ? L("\(tache.liste) · se répète") : tache.liste).font(.secondaire).foregroundStyle(Color.texte2)
             if !tache.notes.isEmpty {
                 ScrollView {
                     Text(tache.notes).font(.secondaire).foregroundStyle(Color.texte).textSelection(.enabled)
@@ -397,7 +395,7 @@ struct DetailTache: View {
             if avecDate {
                 HStack {
                     DatePicker("", selection: $date, displayedComponents: avecHeure ? [.date, .hourAndMinute] : [.date])
-                        .labelsHidden().datePickerStyle(.field).environment(\.locale, Locale(identifier: "fr_FR"))
+                        .labelsHidden().datePickerStyle(.field).environment(\.locale, Loc.locale)
                     Toggle("Heure", isOn: $avecHeure).toggleStyle(.checkbox)
                 }
             }
@@ -457,7 +455,7 @@ struct NouvelleTache: View {
             .pickerStyle(.segmented)
             if quand == "jour" {
                 DatePicker("Jour", selection: $date, displayedComponents: .date)
-                    .environment(\.locale, Locale(identifier: "fr_FR"))
+                    .environment(\.locale, Loc.locale)
             }
             if quand != "aucune" {
                 HStack {

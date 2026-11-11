@@ -3,27 +3,29 @@
 import SwiftUI
 
 private enum Onglet: String, CaseIterable, Identifiable {
-    case classement = "Classement", idees = "Boîte à idées"
+    case classement, idees
     var id: String { rawValue }
+    /// Le libellé de l'onglet (la valeur brute sert d'identifiant, elle ne s'affiche pas).
+    var titre: String { self == .classement ? L("Classement") : L("Boîte à idées") }
 }
 
 private func nombre(_ n: Int?) -> String {
-    guard let n else { return "inconnu" }
-    return n.formatted(.number.locale(Locale(identifier: "fr_FR")))
+    guard let n else { return L("inconnu") }
+    return n.formatted(.number.locale(Loc.locale))
 }
 
 func decimal(_ x: Double, _ chiffres: Int = 1) -> String {
-    x.formatted(.number.precision(.fractionLength(chiffres)).locale(Locale(identifier: "fr_FR")))
+    x.formatted(.number.precision(.fractionLength(chiffres)).locale(Loc.locale))
 }
 
-func libelleEspaceRadar(_ e: String) -> String { e == "kryva" ? "KRYVA" : "Perso" }
+func libelleEspaceRadar(_ e: String) -> String { e == "kryva" ? "KRYVA" : L("Perso") }
 
-private func libelleAge(_ heures: Double) -> String { "\(Int(heures.rounded())) h" }
+private func libelleAge(_ heures: Double) -> String { L("\(Int(heures.rounded())) h") }
 
 private func ilYa(_ iso: String?) -> String? {
     guard let iso, let d = Dates.iso.date(from: iso) else { return nil }
     let h = Date().timeIntervalSince(d) / 3600
-    return h < 1 ? "il y a moins d'une heure" : (h < 48 ? "il y a \(Int(h)) h" : "il y a \(Int(h / 24)) jours")
+    return h < 1 ? L("il y a moins d'une heure") : (h < 48 ? L("il y a \(Int(h)) h") : L("il y a \(Int(h / 24)) jours"))
 }
 
 struct RadarVue: View {
@@ -40,7 +42,7 @@ struct RadarVue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
-                EnTete(titre: "Radar", detail: detail)
+                EnTete(titre: L("Radar"), detail: detail)
                 Button("Fermer") { fermer() }.keyboardShortcut(.cancelAction)
             }
             HStack(spacing: 16) {
@@ -48,7 +50,7 @@ struct RadarVue: View {
                     ForEach(RadarVocabulaire.espaces, id: \.self) { Text(libelleEspaceRadar($0)).tag($0) }
                 }.pickerStyle(.segmented).frame(width: 190).labelsHidden()
                 Picker("Onglet", selection: $onglet) {
-                    ForEach(Onglet.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(Onglet.allCases) { Text($0.titre).tag($0) }
                 }.pickerStyle(.segmented).frame(width: 260).labelsHidden()
                 if onglet == .classement {
                     Picker("Fenêtre", selection: $fenetre) {
@@ -72,8 +74,8 @@ struct RadarVue: View {
     }
 
     private var detail: String {
-        var p = ["Ratio = vues ÷ médiane des autres posts du compte"]
-        if let c = classement, let d = ilYa(c.dernierReleve) { p.append("dernier relevé \(d)") }
+        var p = [L("Ratio = vues ÷ médiane des autres posts du compte")]
+        if let c = classement, let d = ilYa(c.dernierReleve) { p.append(L("dernier relevé \(d)")) }
         return p.joined(separator: " · ")
     }
 
@@ -83,7 +85,7 @@ struct RadarVue: View {
             classement = try stock.radarClassement(espace: espace, fenetre: RadarCalcul.fenetreParDefaut.lowerBound...fenetre)
             idees = try stock.radarIdees(espace: espace)
             erreur = nil
-        } catch { erreur = "Lecture du Radar impossible : \(error)" }
+        } catch { erreur = L("Lecture du Radar impossible : \(String(describing: error))") }
     }
 
     // MARK: Classement
@@ -93,11 +95,11 @@ struct RadarVue: View {
             ForEach(c.avertissements, id: \.self) { a in
                 Label(a, systemImage: "exclamationmark.triangle").font(.secondaire).foregroundStyle(Color.ambre)
             }
-            Carte(titre: "Pistes du moment", detail: "ratio au-dessus de 1, 3 au plus") {
+            Carte(titre: L("Pistes du moment"), detail: L("ratio au-dessus de 1, 3 au plus")) {
                 if c.top.isEmpty {
                     EtatVide(texte: c.classement.isEmpty
-                        ? "Rien à classer pour l'instant : il faut des posts de 6 à \(Int(fenetre)) h avec au moins 5 autres posts du compte sur 30 jours."
-                        : "Aucun post ne dépasse l'habitude de son compte. Le Top n'est pas rempli pour faire joli.")
+                        ? L("Rien à classer pour l'instant : il faut des posts de 6 à \(Int(fenetre)) h avec au moins 5 autres posts du compte sur 30 jours.")
+                        : L("Aucun post ne dépasse l'habitude de son compte. Le Top n'est pas rempli pour faire joli."))
                 }
                 ForEach(Array(c.top.enumerated()), id: \.element.id) { i, l in
                     LigneCarte(dernier: i == c.top.count - 1) { LigneRadar(ligne: l, enregistrer: { garder(l) }) }
@@ -105,7 +107,7 @@ struct RadarVue: View {
             }
             let autres = c.classement.filter { $0.rang == nil }
             if !autres.isEmpty {
-                Carte(titre: "Classement", detail: "\(c.classement.count) posts avec un ratio") {
+                Carte(titre: L("Classement"), detail: L("\(c.classement.count) posts avec un ratio")) {
                     ForEach(Array(autres.enumerated()), id: \.element.id) { i, l in
                         LigneCarte(dernier: i == autres.count - 1) { LigneRadar(ligne: l, enregistrer: { garder(l) }) }
                     }
@@ -117,7 +119,7 @@ struct RadarVue: View {
                         ForEach(Array(c.ecartes.enumerated()), id: \.element.id) { i, l in
                             LigneCarte(dernier: i == c.ecartes.count - 1) {
                                 HStack(alignment: .firstTextBaseline) {
-                                    Text("@\(l.createur) · \(l.plateforme == "tiktok" ? "TikTok" : "Instagram")").font(.secondaire).foregroundStyle(Color.texte)
+                                    Text(verbatim: "@\(l.createur) · \(l.plateforme == "tiktok" ? "TikTok" : "Instagram")").font(.secondaire).foregroundStyle(Color.texte)
                                     Text(l.legende.isEmpty ? l.postId : l.legende).font(.secondaire).foregroundStyle(Color.texte3).lineLimit(1)
                                     Spacer()
                                     Text(l.raison ?? "").font(.petit).foregroundStyle(Color.texte2)
@@ -131,7 +133,7 @@ struct RadarVue: View {
                 }
             }
         } else {
-            EtatChargement(texte: "Lecture du Radar")
+            EtatChargement(texte: L("Lecture du Radar"))
         }
     }
 
@@ -145,8 +147,9 @@ struct RadarVue: View {
 
     @ViewBuilder private var vueIdees: some View {
         if idees.isEmpty {
-            Carte(titre: "Boîte à idées") {
-                EtatVide(texte: "Aucune idée gardée pour \(libelleEspaceRadar(espace)). Dans le classement, « Garder l'idée » fige le post (lien, chiffres, ratio) et ouvre votre brouillon ici.")
+            Carte(titre: L("Boîte à idées")) {
+                // Le texte cite le bouton « Garder l'idée » : la traduction doit reprendre le libellé du bouton.
+                EtatVide(texte: L("Aucune idée gardée pour \(libelleEspaceRadar(espace)). Dans le classement, « Garder l'idée » fige le post (lien, chiffres, ratio) et ouvre votre brouillon ici."))
             }
         }
         ForEach(idees) { i in
@@ -162,7 +165,7 @@ private struct LigneRadar: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            if let r = ligne.rang { Pastille(texte: "n° \(r)", couleur: .action).frame(width: 52, alignment: .leading) }
+            if let r = ligne.rang { Pastille(texte: L("n° \(r)"), couleur: .action).frame(width: 52, alignment: .leading) }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text("@\(ligne.createur)").font(.ligneForte).foregroundStyle(Color.texte)
@@ -179,7 +182,7 @@ private struct LigneRadar: View {
             .frame(minWidth: 110, alignment: .trailing)
             VStack(alignment: .trailing, spacing: 6) {
                 if ligne.ideeId != nil {
-                    Pastille(texte: "Dans la boîte", couleur: .vert)
+                    Pastille(texte: L("Dans la boîte"), couleur: .vert)
                 } else {
                     Button("Garder l'idée", action: enregistrer).buttonStyle(.borderedProminent).tint(.action).controlSize(.small)
                 }
@@ -192,11 +195,11 @@ private struct LigneRadar: View {
     }
 
     private var chiffres: String {
-        var p = ["\(nombre(ligne.vues)) vues", "publié il y a \(libelleAge(ligne.ageHeures)) au relevé"]
-        if let v = ligne.vuesParHeure { p.append("\(nombre(Int(v.rounded()))) vues/h") }
-        if let l = ligne.likesPour1000Vues { p.append("\(decimal(l, 0)) j'aime / 1 000 vues") }
-        p.append("\(ligne.references) posts de référence")
-        if ligne.source != "manuelle" { p.append("source : \(ligne.source)") }
+        var p = [L("\(nombre(ligne.vues)) vues"), L("publié il y a \(libelleAge(ligne.ageHeures)) au relevé")]
+        if let v = ligne.vuesParHeure { p.append(L("\(nombre(Int(v.rounded()))) vues/h")) }
+        if let l = ligne.likesPour1000Vues { p.append(L("\(decimal(l, 0)) j'aime / 1 000 vues")) }
+        p.append(L("\(ligne.references) posts de référence"))
+        if ligne.source != "manuelle" { p.append(L("source : \(ligne.source)")) }
         return p.joined(separator: " · ")
     }
 }
@@ -210,7 +213,7 @@ private struct FicheIdee: View {
     @State private var statut = "a_ecrire"
     @State private var revisionLue = -1
 
-    private static let statuts: [(String, String)] = [("a_ecrire", "À écrire"), ("en_cours", "En cours"), ("pret", "Prêt à tourner")]
+    private static var statuts: [(String, String)] { [("a_ecrire", L("À écrire")), ("en_cours", L("En cours")), ("pret", L("Prêt à tourner"))] }
     private var modifie: Bool { brouillon != idee.brouillon || statut != idee.statut }
 
     var body: some View {
@@ -219,8 +222,7 @@ private struct FicheIdee: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Source figée le \(idee.creeLe.prefix(10))").font(.petit.weight(.semibold)).foregroundStyle(Color.texte3)
                     if !idee.sourceFigee.legende.isEmpty { Text(idee.sourceFigee.legende).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(3) }
-                    Text("\(nombre(idee.sourceFigee.vues)) vues · ratio \(idee.sourceFigee.ratio.map { "×" + decimal($0) } ?? "inconnu") · \(idee.sourceFigee.references) posts de référence")
-                        .font(.petit).foregroundStyle(Color.texte3)
+                    Text(chiffresSource).font(.petit).foregroundStyle(Color.texte3)
                     if let u = URL(string: idee.sourceFigee.url), !idee.sourceFigee.url.isEmpty { Link("Voir le post", destination: u).font(.petit) }
                 }
                 Text("Notre version").font(.petit.weight(.semibold)).foregroundStyle(Color.texte3)
@@ -249,6 +251,12 @@ private struct FicheIdee: View {
         .onAppear { charger() }
         // Une autre session a écrit : sans modification en cours on se met à jour ; sinon on garde la saisie et on propose de relire.
         .onChange(of: idee.revision) { _, _ in if !modifie { charger() } }
+    }
+
+    private var chiffresSource: String {
+        let s = idee.sourceFigee
+        let ratio = s.ratio.map { "×" + decimal($0) } ?? L("inconnu")
+        return [L("\(nombre(s.vues)) vues"), L("ratio \(ratio)"), L("\(s.references) posts de référence")].joined(separator: " · ")
     }
 
     private func charger() {
@@ -285,10 +293,10 @@ struct CarteRadar: View {
 
     /// Sans relevé, la carte reste là (sinon le Radar passe pour absent) : une ligne, et un clic qui ouvre l'écran complet.
     private var carteCourte: some View {
-        Carte(titre: "Radar") {
+        Carte(titre: L("Radar")) {
             Button { etat.radarOuvert = true } label: {
                 HStack {
-                    Text(Date() < Self.premierReleve ? "Premier relevé jeudi 29/10 vers 10 h" : "En attente du premier relevé")
+                    Text(Date() < Self.premierReleve ? L("Premier relevé jeudi 29/10 vers 10 h") : L("En attente du premier relevé"))
                         .font(.ligne).foregroundStyle(Color.texte2)
                     Spacer()
                     Image(systemName: "chevron.right").font(.petit).foregroundStyle(Color.texte3)
@@ -302,16 +310,16 @@ struct CarteRadar: View {
     }
 
     private var carte: some View {
-        Carte(titre: "Radar", detail: "pistes du moment : posts au-dessus de l'habitude de leur compte") {
+        Carte(titre: L("Radar"), detail: L("pistes du moment : posts au-dessus de l'habitude de leur compte")) {
             ForEach(etat.radar, id: \.espace) { c in
                 if c.nbPosts > 0 {
-                    Text("\(libelleEspaceRadar(c.espace)) · \(c.top.count)").font(.secondaire.weight(.semibold)).foregroundStyle(Color.texte2)
+                    Text(verbatim: "\(libelleEspaceRadar(c.espace)) · \(c.top.count)").font(.secondaire.weight(.semibold)).foregroundStyle(Color.texte2)
                         .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
-                    if c.top.isEmpty { EtatVide(texte: c.avertissements.first ?? "Aucun post au-dessus de l'habitude de son compte.") }
+                    if c.top.isEmpty { EtatVide(texte: c.avertissements.first ?? L("Aucun post au-dessus de l'habitude de son compte.")) }
                     ForEach(Array(c.top.enumerated()), id: \.element.id) { i, l in
                         LigneCarte(dernier: i == c.top.count - 1) {
                             HStack {
-                                Pastille(texte: "n° \(l.rang ?? i + 1)", couleur: .action).frame(width: 52, alignment: .leading)
+                                Pastille(texte: L("n° \(l.rang ?? i + 1)"), couleur: .action).frame(width: 52, alignment: .leading)
                                 Text("@\(l.createur)").font(.ligneForte).foregroundStyle(Color.texte)
                                 Text(l.legende).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
                                 Spacer()

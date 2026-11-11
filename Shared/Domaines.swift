@@ -12,11 +12,11 @@ enum Domaine: String, CaseIterable, Codable, Identifiable {
 
     var titre: String {
         switch self {
-        case .app: return "App KRYVA"
-        case .reseaux: return "Réseaux"
-        case .ventes: return "Ventes KRYVA"
+        case .app: return L("App KRYVA")
+        case .reseaux: return L("Réseaux")
+        case .ventes: return L("Ventes KRYVA")
         case .freelance: return "Freelance"
-        case .papiers: return "Papiers"
+        case .papiers: return L("Papiers")
         case .pilote: return "Pilote"
         }
     }
@@ -35,6 +35,18 @@ enum Domaine: String, CaseIterable, Codable, Identifiable {
     var agent: String {
         switch self {
         case .app: return "App"
+        case .reseaux: return L("Réseaux")
+        case .ventes: return L("Ventes")
+        case .freelance: return "FREELANCE"
+        case .papiers: return L("Papiers")
+        case .pilote: return "PILOTE"
+        }
+    }
+    /// Le nom court en français, quelle que soit la langue de l'écran : ce qu'on écrit aux agents (consignes, relances), qui
+    /// travaillent en français.
+    var agentFrancais: String {
+        switch self {
+        case .app: return "App"
         case .reseaux: return "Réseaux"
         case .ventes: return "Ventes"
         case .freelance: return "FREELANCE"
@@ -46,10 +58,10 @@ enum Domaine: String, CaseIterable, Codable, Identifiable {
     /// Le mot de la pastille rouge (à faire ou bloqué), propre au domaine.
     var motRouge: String {
         switch self {
-        case .app: return "à corriger"
-        case .reseaux: return "à préparer"
-        case .ventes, .freelance: return "en retard"
-        case .papiers, .pilote: return "à faire"
+        case .app: return L("à corriger")
+        case .reseaux: return L("à préparer")
+        case .ventes, .freelance: return L("en retard")
+        case .papiers, .pilote: return L("à faire")
         }
     }
 
@@ -93,11 +105,11 @@ enum CaseDomaine: String, CaseIterable, Codable, Identifiable {
 
     var titre: String {
         switch self {
-        case .fait: return "Fait"
-        case .enCours: return "En cours"
-        case .pasPuFaire: return "Pas pu faire"
-        case .prepare: return "Préparé"
-        case .aFaire: return "À faire"
+        case .fait: return L("Fait")
+        case .enCours: return L("En cours")
+        case .pasPuFaire: return L("Pas pu faire")
+        case .prepare: return L("Préparé")
+        case .aFaire: return L("À faire")
         }
     }
 
@@ -155,6 +167,40 @@ struct ElementDomaine: Identifiable, Hashable, Codable {
     var cle = ""
     /// 09/11 (Organisation) : qui cette chose attend, hors de l'agent (« PILOTE », « l'académie ») ; vide sinon.
     var attend = ""
+    /// Une personne (Ventes, Freelance) : le geste écrit de Sacha, sa date comprise (« Visio avec Arthur (mar. 10/11) »), sans
+    /// « Pour toi : ». Un champ à part : la pastille le reprend sans relire le texte affiché, qui se traduit.
+    var gesteTexte: String? = nil
+}
+
+/// Ce qui fera partir une chose prête (section « Prêt, … ») : une valeur, pas un texte relu, car le titre se traduit.
+enum SuitePret: Hashable, Codable {
+    case aucune, attendPush, fusionner, partALHeure, envoyerLeJour
+    case preciser(String)      // l'agent qui doit préciser la suite
+    case fairePartir(String)   // l'agent qui fait partir la chose
+    case attend(String)        // qui elle attend
+
+    /// « attend ton push » ; au pluriel (« 3 prêts, attendent ton push ») seuls les verbes s'accordent.
+    func texte(pluriel: Bool = false) -> String {
+        switch self {
+        case .aucune: return ""
+        case .attendPush: return pluriel ? L("attendent ton push") : L("attend ton push")
+        case .fusionner: return L("à fusionner par \(Domaine.app.agent)")
+        case .partALHeure: return pluriel ? L("partent à l'heure prévue") : L("part à l'heure prévue")
+        case .envoyerLeJour: return L("à envoyer le jour prévu")
+        case .preciser(let agent): return L("suite à préciser par \(agent)")
+        case .fairePartir(let agent): return L("à faire partir par \(agent)")
+        case .attend(let qui): return pluriel ? L("attendent \(qui)") : L("attend \(qui)")
+        }
+    }
+
+    /// Le titre de la section : « Prêt, attend ton push ».
+    var titre: String { self == .aucune ? L("Prêt") : L("Prêt") + ", " + texte() }
+
+    /// La pastille du bilan : « 1 prêt, attend ton push », « 3 prêts, attendent ton push ».
+    func pastille(n: Int) -> String {
+        let nombre = n == 1 ? L("1 prêt") : L("\(n) prêts")
+        return self == .aucune ? nombre : nombre + ", " + texte(pluriel: n > 1)
+    }
 }
 
 /// Une section du domaine déplié (09/11) : les mêmes mots et les mêmes nombres que la ligne fermée.
@@ -162,6 +208,8 @@ struct SectionDomaine: Identifiable, Hashable, Codable {
     var titre: String
     var elements: [ElementDomaine]
     var ton: TonStatut = .gris
+    /// Renseigné pour une section « Prêt… » (le bilan la reconnaît par là, pas par son titre).
+    var pret: SuitePret? = nil
     var id: String { titre }
 }
 
@@ -253,6 +301,8 @@ struct ResumeContact: Hashable, Codable {
     var envoiLe = ""
     /// Ce premier message attend une condition pas encore cochée.
     var envoiSousCondition = false
+    /// 10/11 : l'agent a marqué « aucune réponse due » et rien n'est arrivé depuis : la réponse reçue n'est plus à traiter.
+    var aucuneReponseDue = false
 }
 
 /// Un rappel de la liste Papiers.
@@ -355,7 +405,12 @@ enum Domaines {
             dedoublonner(&cases)
             // L'écran de Sacha dit « tu » partout, sujets de commit compris (« validée par Sacha » → « validée par toi »).
             for k in cases.keys {
-                cases[k] = cases[k]?.map { var x = $0; x.titre = Libelles.tutoyer(x.titre); x.detail = Libelles.tutoyer(x.detail); return x }
+                cases[k] = cases[k]?.map {
+                    var x = $0
+                    x.titre = Libelles.tutoyer(x.titre); x.detail = Libelles.tutoyer(x.detail)
+                    x.gesteTexte = x.gesteTexte.map(Libelles.tutoyer)
+                    return x
+                }
             }
             if var aFaire = cases[.aFaire] {
                 aFaire.sort { ($0.quand ?? .distantFuture) < ($1.quand ?? .distantFuture) }
@@ -403,13 +458,15 @@ enum Domaines {
         let detail: String
         switch c.etat {
         case .fait:
-            ton = .vert; detail = "Fait par \(qui)" + (quand.map { " \($0)" } ?? "")
+            ton = .vert; detail = quand.map { L("Fait par \(qui) \($0)") } ?? L("Fait par \(qui)")
         case .enCours:
-            ton = .ambre; detail = "\(qui) y travaille" + (le.map { " depuis \(Libelles.depuis($0, maintenant: maintenant))" } ?? "")
+            ton = .ambre
+            detail = le.map { L("\(qui) y travaille depuis \(Libelles.depuis($0, maintenant: maintenant))") } ?? L("\(qui) y travaille")
         case .prepare:
-            ton = .ambre; detail = "Préparé par \(qui)" + (quand.map { " \($0)" } ?? "")
+            ton = .ambre; detail = quand.map { L("Préparé par \(qui) \($0)") } ?? L("Préparé par \(qui)")
         case .aFaire:
-            ton = .ambre; detail = "\(qui) · sans heure prévue" + (le.map { ", noté le \(Libelles.jourHeure($0))" } ?? "")
+            ton = .ambre
+            detail = le.map { L("\(qui) · sans heure prévue, noté le \(Libelles.jourHeure($0))") } ?? L("\(qui) · sans heure prévue")
         case .pasPuFaire:
             ton = .rouge; detail = (pourquoi.isEmpty ? "" : pourquoi + " · ") + qui + (quand.map { ", \($0)" } ?? "")
         }
@@ -427,29 +484,30 @@ enum Domaines {
         guard c.etat != .fait, !attend.isEmpty else { return (c.etat, el) }
         let qui = TravailAgents.domaine(c.auteur)?.agent ?? c.domaine.agent
         let le = Dates.iso.date(from: c.majLe)
-        let depuis = le.map { " depuis \(Libelles.depuisLe($0, maintenant: s.maintenant))" } ?? ""
-        let pourquoi = c.pourquoi.isEmpty ? "" : " : \(Libelles.tutoyer(c.pourquoi))"
+        let depuis = le.map { Libelles.depuisLe($0, maintenant: s.maintenant) }
+        let pourquoi = c.pourquoi.isEmpty ? "" : Libelles.tutoyer(c.pourquoi)
         let attente: CaseDomaine = c.etat == .pasPuFaire ? .enCours : c.etat
         if attend == "\(Moi.nom)" {
             guard let rappels = s.rappelsSacha else {
                 el.pourToi = true
-                el.detail = "\(qui) attend ton geste\(depuis) · Rappels pas accessibles"
+                el.detail = depuis.map { L("\(qui) attend ton geste depuis \($0) · Rappels pas accessibles") }
+                    ?? L("\(qui) attend ton geste · Rappels pas accessibles")
                 return (attente, el)
             }
             guard let r = rappelLie(c.rappel, rappels) else {
                 el.ton = .rouge
-                el.detail = "Attend toi, mais aucun rappel à ton nom (« \(court(c.rappel, 30)) ») : à poser par \(qui)"
+                el.detail = L("Attend toi, mais aucun rappel à ton nom (« \(court(c.rappel, 30)) ») : à poser par \(qui)")
                 return (.pasPuFaire, el)
             }
             if r.faite {
-                el.detail += " · ton geste est fait (« \(court(r.titre, 40)) »), \(qui) reprend"
+                el.detail += " · " + L("ton geste est fait (« \(court(r.titre, 40)) »), \(qui) reprend")
                 return (c.etat, el)
             }
             let retard = r.echeance.map { $0 < s.maintenant } ?? false
             el.cle = el.titre
             el.titre = titre(r)
-            el.detail = "\(qui) l'attend pour « \(court(Libelles.tutoyer(c.texte), 60)) » · "
-                + (r.echeance.map { (retard ? "en retard, échéance " : "échéance ") + Libelles.jourCourt($0) } ?? "sans échéance")
+            let pour = court(Libelles.tutoyer(c.texte), 60)
+            el.detail = L("\(qui) l'attend pour « \(pour) »") + " · " + texteEcheance(r.echeance, retard: retard)
             el.quand = r.echeance
             el.ton = retard ? .rouge : .ambre
             el.pourToi = true
@@ -460,21 +518,29 @@ enum Domaines {
         if attend == c.domaine.agent { el.attend = attend; return (c.etat, el) }
         el.attend = attend
         el.ton = .ambre
-        el.detail = "\(qui) · attend \(attend)\(depuis)\(pourquoi)"
+        var detail = depuis.map { L("\(qui) · attend \(attend) depuis \($0)") } ?? L("\(qui) · attend \(attend)")
+        if !pourquoi.isEmpty { detail = L("\(detail) : \(pourquoi)") }
+        el.detail = detail
         return (attente, el)
     }
 
     /// Un ❓ ou un rappel de Sacha qui sert l'agent du domaine : sa ligne « Pour toi », avec le geste de sa ligne dans À toi.
     private static func element(_ r: TacheDomaine, _ d: Domaine, maintenant: Date) -> ElementDomaine {
         let retard = r.echeance.map { $0 < maintenant } ?? false
-        let detail = (r.decision ? "\(d.agent) attend ta décision · " : "\(d.agent) attend ce geste · ")
-            + (r.echeance.map { (retard ? "en retard, échéance " : "échéance ") + Libelles.jourCourt($0) } ?? "sans échéance")
+        let detail = (r.decision ? L("\(d.agent) attend ta décision") : L("\(d.agent) attend ce geste")) + " · "
+            + texteEcheance(r.echeance, retard: retard)
         return ElementDomaine(id: "rappel:\(r.id)", titre: titre(r), detail: detail, quand: r.echeance, ton: retard ? .rouge : .ambre,
                               pourToi: true, geste: geste(r, maintenant: maintenant))
     }
 
     private static func titre(_ r: TacheDomaine) -> String {
-        r.decision ? "Décider : \(Decisions.question(r.titre))" : Libelles.tutoyer(r.titre)
+        r.decision ? L("Décider : \(Decisions.question(r.titre))") : Libelles.tutoyer(r.titre)
+    }
+
+    /// « échéance 10/11 », « en retard, échéance 10/11 », « sans échéance ».
+    private static func texteEcheance(_ d: Date?, retard: Bool) -> String {
+        guard let d else { return L("sans échéance") }
+        return retard ? L("en retard, échéance \(Libelles.jourCourt(d))") : L("échéance \(Libelles.jourCourt(d))")
     }
 
     /// Le geste vers À toi : un ❓ y est dès qu'il est posé ; un rappel, s'il est dû aujourd'hui ou en retard.
@@ -521,18 +587,18 @@ enum Domaines {
         let titre = Libelles.tutoyer(t.titre)
         if t.faite {
             guard let le = t.faiteLe, le > maintenant.addingTimeInterval(-7 * jour) else { return nil }
-            return (.fait, ElementDomaine(id: id, titre: titre, detail: "Fait par \(d.agent) \(Libelles.quand(le, maintenant: maintenant))",
+            return (.fait, ElementDomaine(id: id, titre: titre, detail: L("Fait par \(d.agent) \(Libelles.quand(le, maintenant: maintenant))"),
                                           quand: le, ton: .vert, agent: d.equipe))
         }
         guard let p = t.prevu else {
-            return (.aFaire, ElementDomaine(id: id, titre: titre, detail: "\(d.agent) · sans heure prévue", ton: .gris, agent: d.equipe))
+            return (.aFaire, ElementDomaine(id: id, titre: titre, detail: L("\(d.agent) · sans heure prévue"), ton: .gris, agent: d.equipe))
         }
         if p < maintenant {
             return (.pasPuFaire, ElementDomaine(id: id, titre: titre,
-                                                detail: "\(d.agent) · prévu \(Libelles.quand(p, maintenant: maintenant)), pas encore fait",
+                                                detail: L("\(d.agent) · prévu \(Libelles.quand(p, maintenant: maintenant)), pas encore fait"),
                                                 quand: p, ton: .rouge, agent: d.equipe))
         }
-        return (.aFaire, ElementDomaine(id: id, titre: titre, detail: "\(d.agent) · prévu \(Libelles.quand(p, maintenant: maintenant))",
+        return (.aFaire, ElementDomaine(id: id, titre: titre, detail: L("\(d.agent) · prévu \(Libelles.quand(p, maintenant: maintenant))"),
                                         quand: p, ton: .ambre, agent: d.equipe))
     }
 
@@ -634,8 +700,13 @@ enum Domaines {
 
     // MARK: Les sections, le bilan, qui
 
-    static let pourToi = "Pour toi"
-    static func aFairePar(_ d: Domaine) -> String { "À faire par \(d.agent)" }
+    // Les titres des sections : le code les retrouve avec ces mêmes fonctions, jamais avec un texte écrit en dur.
+    static var pourToi: String { L("Pour toi") }
+    static var titreProbleme: String { L("Problème") }
+    static var titreEnCours: String { L("En cours") }
+    static var titreFaitAujourdhui: String { L("Fait aujourd'hui") }
+    static var titreFait7Jours: String { L("Fait ces 7 derniers jours") }
+    static func aFairePar(_ d: Domaine) -> String { L("À faire par \(d.agent)") }
 
     /// Le domaine déplié (09/11) : chaque section porte le mot du bilan de la ligne fermée, avec le même nombre.
     static func sections(_ d: Domaine, _ e: EtatDomaine, maintenant: Date) -> [SectionDomaine] {
@@ -645,9 +716,9 @@ enum Domaines {
         // « Prêt » dit ce qui le fera partir : « Prêt, à fusionner par App », « Prêt, attend ton push »…
         var prets: [SectionDomaine] = []
         for el in e.elements(.prepare) where !el.pourToi {
-            let titre = "Prêt" + suitePret(el, d)
-            if let i = prets.firstIndex(where: { $0.titre == titre }) { prets[i].elements.append(el) }
-            else { prets.append(SectionDomaine(titre: titre, elements: [el], ton: .ambre)) }
+            let suite = suitePret(el, d)
+            if let i = prets.firstIndex(where: { $0.pret == suite }) { prets[i].elements.append(el) }
+            else { prets.append(SectionDomaine(titre: suite.titre, elements: [el], ton: .ambre, pret: suite)) }
         }
         let faits = e.elements(.fait)
         // Une réponse reçue n'est pas un travail fait : elle attend l'agent.
@@ -656,31 +727,31 @@ enum Domaines {
         let duJour = vraiment.filter { $0.quand.map { cal.isDate($0, inSameDayAs: maintenant) } ?? false }
         let avant = vraiment.filter { el in !duJour.contains { $0.id == el.id } }
         return ([
-            SectionDomaine(titre: "Problème", elements: e.elements(.pasPuFaire), ton: .rouge),
+            SectionDomaine(titre: titreProbleme, elements: e.elements(.pasPuFaire), ton: .rouge),
             SectionDomaine(titre: Self.pourToi, elements: pourToi, ton: pourToi.contains { $0.ton == .rouge } ? .rouge : .ambre),
-            SectionDomaine(titre: "En cours", elements: e.elements(.enCours).filter { !$0.pourToi }, ton: .vert),
+            SectionDomaine(titre: titreEnCours, elements: e.elements(.enCours).filter { !$0.pourToi }, ton: .vert),
             SectionDomaine(titre: reponsesPar(d), elements: reponses, ton: .ambre),
             SectionDomaine(titre: aFairePar(d), elements: e.elements(.aFaire).filter { !$0.pourToi }, ton: .ambre),
         ] + prets + [
-            SectionDomaine(titre: "Fait aujourd'hui", elements: duJour, ton: .vert),
-            SectionDomaine(titre: "Fait ces 7 derniers jours", elements: avant, ton: .vert),
+            SectionDomaine(titre: titreFaitAujourdhui, elements: duJour, ton: .vert),
+            SectionDomaine(titre: titreFait7Jours, elements: avant, ton: .vert),
         ]).filter { !$0.elements.isEmpty }
     }
 
-    static func reponsesPar(_ d: Domaine) -> String { "Réponse reçue, à traiter par \(d.agent)" }
+    static func reponsesPar(_ d: Domaine) -> String { L("Réponse reçue, à traiter par \(d.agent)") }
 
     /// Ce qui fera partir une chose prête, et qui le fait. Une carte le dit par « attend » (09/11, Organisation : « 1 prêt »
     /// seul ne dit pas qui agit) ; une ancienne carte qui ne le dit pas le montre.
-    static func suitePret(_ el: ElementDomaine, _ d: Domaine) -> String {
-        if el.id.hasPrefix("git:") { return el.cle.isEmpty ? ", attend ton push" : ", à fusionner par App" }
-        if el.id.hasPrefix("pub:") { return ", part à l'heure prévue" }
-        if el.id.hasPrefix("contact:") { return ", à envoyer le jour prévu" }
+    static func suitePret(_ el: ElementDomaine, _ d: Domaine) -> SuitePret {
+        if el.id.hasPrefix("git:") { return el.cle.isEmpty ? .attendPush : .fusionner }
+        if el.id.hasPrefix("pub:") { return .partALHeure }
+        if el.id.hasPrefix("contact:") { return .envoyerLeJour }
         if el.id.hasPrefix("carte:") {
-            if el.attend.isEmpty { return ", suite à préciser par \(d.agent)" }
-            if el.attend == d.agent { return ", à faire partir par \(d.agent)" }
-            return ", attend \(el.attend)"
+            if el.attend.isEmpty { return .preciser(d.agent) }
+            if el.attend == d.agent { return .fairePartir(d.agent) }
+            return .attend(el.attend)
         }
-        return ""
+        return .aucune
     }
 
     /// Les cartes qui attendent quelqu'un d'autre que l'agent, par qui, dans l'ordre : (qui, combien, depuis le plus ancien).
@@ -705,42 +776,55 @@ enum Domaines {
     /// Le travail des agents, section par section, avec les mêmes mots (« 13 à faire par App » = la section « À faire par App »).
     static func bilan(_ d: Domaine, _ e: EtatDomaine, maintenant: Date) -> [PastilleStatut] {
         var l: [PastilleStatut] = []
-        let problemes = section(e, "Problème").count
-        if problemes > 0 { l.append(PastilleStatut(texte: problemes == 1 ? "1 problème" : "\(problemes) problèmes", ton: .rouge)) }
+        let problemes = section(e, titreProbleme).count
+        if problemes > 0 { l.append(PastilleStatut(texte: problemes == 1 ? L("1 problème") : L("\(problemes) problèmes"), ton: .rouge)) }
         // 09/11 (Organisation) : un « en cours » qui attend quelqu'un est compté en le nommant (« 1 en cours attend PILOTE
         // depuis 17:34 », « 3 en cours, dont 1 attend l'académie depuis 17:04 »).
-        let enCoursEl = section(e, "En cours")
+        let enCoursEl = section(e, titreEnCours)
         if !enCoursEl.isEmpty {
             let n = enCoursEl.count
             let att = attendus(enCoursEl, d)
+            // « attend PILOTE depuis 17:34 » : le verbe s'accorde avec le nombre de cartes qui attendent.
             func dit(_ a: (qui: String, n: Int, depuis: Date?)) -> String {
-                "\(a.n > 1 ? "attendent" : "attend") \(a.qui)" + (a.depuis.map { " depuis \(Libelles.depuisLe($0, maintenant: maintenant))" } ?? "")
+                let qui = a.qui
+                if let h = a.depuis.map({ Libelles.depuisLe($0, maintenant: maintenant) }) {
+                    return a.n > 1 ? L("attendent \(qui) depuis \(h)") : L("attend \(qui) depuis \(h)")
+                }
+                return a.n > 1 ? L("attendent \(qui)") : L("attend \(qui)")
             }
             let texte: String
-            if att.count == 1 && att[0].n == n { texte = "\(n) en cours \(dit(att[0]))" }
-            else if att.isEmpty { texte = "\(n) en cours" }
-            else { texte = "\(n) en cours, dont " + att.map { "\($0.n) \(dit($0))" }.joined(separator: ", ") }
+            if att.count == 1 && att[0].n == n { let clause = dit(att[0]); texte = L("\(n) en cours \(clause)") }
+            else if att.isEmpty { texte = L("\(n) en cours") }
+            else {
+                let liste = att.map { String($0.n) + " " + dit($0) }.joined(separator: ", ")
+                texte = L("\(n) en cours, dont \(liste)")
+            }
             l.append(PastilleStatut(texte: texte, ton: att.isEmpty ? .vert : .ambre))
         }
         let reponses = section(e, reponsesPar(d)).count
         if reponses > 0 {
-            l.append(PastilleStatut(texte: (reponses == 1 ? "1 réponse reçue" : "\(reponses) réponses reçues") + ", à traiter par \(d.agent)", ton: .ambre))
+            let agent = d.agent
+            l.append(PastilleStatut(texte: reponses == 1 ? L("1 réponse reçue, à traiter par \(agent)")
+                                                         : L("\(reponses) réponses reçues, à traiter par \(agent)"), ton: .ambre))
         }
         let aFaire = section(e, aFairePar(d))
         if !aFaire.isEmpty {
             let cal = Calendar.current
             let duJour = aFaire.compactMap(\.quand).filter { $0 >= maintenant && cal.isDate($0, inSameDayAs: maintenant) }
-            let dont = duJour.max().map { ", dont \(duJour.count) d'ici \(Libelles.heureCourte($0))" } ?? ""
-            l.append(PastilleStatut(texte: "\(aFaire.count) à faire par \(d.agent)" + dont, ton: .ambre))
+            let agent = d.agent, n = aFaire.count
+            let texte = duJour.max().map { fin -> String in
+                let h = Libelles.heureCourte(fin), k = duJour.count
+                return L("\(n) à faire par \(agent), dont \(k) d'ici \(h)")
+            } ?? L("\(n) à faire par \(agent)")
+            l.append(PastilleStatut(texte: texte, ton: .ambre))
         }
-        for sec in e.sections where sec.titre.hasPrefix("Prêt") {
-            let n = sec.elements.count
-            var suite = String(sec.titre.dropFirst("Prêt".count))
-            if n > 1 { suite = suite.replacingOccurrences(of: ", part ", with: ", partent ").replacingOccurrences(of: ", attend ", with: ", attendent ") }
-            l.append(PastilleStatut(texte: (n == 1 ? "1 prêt" : "\(n) prêts") + suite, ton: .ambre))
+        // Une section « Prêt… » se reconnaît à son champ `pret`, pas à son titre.
+        for sec in e.sections {
+            guard let suite = sec.pret else { continue }
+            l.append(PastilleStatut(texte: suite.pastille(n: sec.elements.count), ton: .ambre))
         }
-        let faits = section(e, "Fait aujourd'hui").count
-        if faits > 0 { l.append(PastilleStatut(texte: (faits == 1 ? "1 fait" : "\(faits) faits") + " aujourd'hui", ton: .vert)) }
+        let faits = section(e, titreFaitAujourdhui).count
+        if faits > 0 { l.append(PastilleStatut(texte: faits == 1 ? L("1 fait aujourd'hui") : L("\(faits) faits aujourd'hui"), ton: .vert)) }
         return l
     }
 
@@ -750,20 +834,25 @@ enum Domaines {
         let tenant = Self.tenant(d, s)
         let autres = s.sessions.filter { $0.etat == "busy" && $0.id != tenant?.id
             && Domaine.deSession(titre: $0.titre, dossier: $0.dossier) == d }.count
-        let enPlus = autres == 0 ? "" : (autres == 1 ? " · 1 autre session au travail" : " · \(autres) autres sessions au travail")
+        let enPlus = autres == 0 ? "" : " · " + (autres == 1 ? L("1 autre session au travail") : L("\(autres) autres sessions au travail"))
         let attente = e.map { enAttente(d, s, $0) } ?? ""
         // Du travail attend pendant que personne ne s'en occupe : le point passe à l'ambre.
         let calme: TonStatut = e.flatMap { Self.attente(d, $0, maintenant: s.maintenant) } != nil ? .ambre : .gris
-        guard let t = tenant else { return ("\(d.agent) n'est pas lancé" + attente + enPlus, autres > 0 ? .vert : calme) }
+        let agent = d.agent
+        guard let t = tenant else { return (L("\(agent) n'est pas lancé") + attente + enPlus, autres > 0 ? .vert : calme) }
         switch t.etat {
         case "busy":
-            let quoi = t.etape.isEmpty ? "" : " : \(court(t.etape, 70))" + (t.n > 0 ? " (étape \(t.k)/\(t.n))" : "")
-            return ("\(d.agent) au travail\(quoi)" + enPlus, .vert)
+            var texte = L("\(agent) au travail")
+            if !t.etape.isEmpty {
+                let etape = court(t.etape, 70)
+                texte = t.n > 0 ? L("\(agent) au travail : \(etape) (étape \(t.k)/\(t.n))") : L("\(agent) au travail : \(etape)")
+            }
+            return (texte + enPlus, .vert)
         case "waiting":
-            return ((t.question.isEmpty ? "\(d.agent) attend un message de toi" : "\(d.agent) attend ta réponse, dans À toi") + enPlus, .ambre)
+            return ((t.question.isEmpty ? L("\(agent) attend un message de toi") : L("\(agent) attend ta réponse, dans À toi")) + enPlus, .ambre)
         default:
-            let depuis = t.depuis.map { " depuis \(Libelles.depuis($0, maintenant: s.maintenant))" } ?? ""
-            return ("\(d.agent) en pause\(depuis)" + attente + enPlus, autres > 0 ? .vert : calme)
+            let pause = t.depuis.map { L("\(agent) en pause depuis \(Libelles.depuis($0, maintenant: s.maintenant))") } ?? L("\(agent) en pause")
+            return (pause + attente + enPlus, autres > 0 ? .vert : calme)
         }
     }
 
@@ -776,27 +865,47 @@ enum Domaines {
     /// Le travail qui attend l'agent, avec les mots du bilan : réponses reçues, puis problèmes (un travail d'agent en retard
     /// est un problème). `depuis` = le plus ancien des deux, s'il est daté.
     struct Attente: Hashable {
-        var quoi: String
+        var reponses: Int
+        var problemes: Int
         var n: Int
         var depuis: Date?
         var titres: [String]
+
+        /// « 1 réponse reçue et 1 problème ». `francais` : le texte envoyé à l'agent, qui travaille en français quelle que
+        /// soit la langue de l'écran.
+        func quoi(francais: Bool = false) -> String {
+            let r: String, p: String
+            if francais {
+                r = reponses == 1 ? "1 réponse reçue" : "\(reponses) réponses reçues"
+                p = problemes == 1 ? "1 problème" : "\(problemes) problèmes"
+                return reponses > 0 && problemes > 0 ? "\(r) et \(p)" : (reponses > 0 ? r : p)
+            }
+            r = reponses == 1 ? L("1 réponse reçue") : L("\(reponses) réponses reçues")
+            p = problemes == 1 ? L("1 problème") : L("\(problemes) problèmes")
+            return reponses > 0 && problemes > 0 ? L("\(r) et \(p)") : (reponses > 0 ? r : p)
+        }
     }
 
     static func attente(_ d: Domaine, _ e: EtatDomaine, maintenant: Date) -> Attente? {
         let reponses = section(e, reponsesPar(d))
         let problemes = e.elements(.pasPuFaire)
-        var morceaux: [String] = []
-        if !reponses.isEmpty { morceaux.append(reponses.count == 1 ? "1 réponse reçue" : "\(reponses.count) réponses reçues") }
-        if !problemes.isEmpty { morceaux.append(problemes.count == 1 ? "1 problème" : "\(problemes.count) problèmes") }
-        guard !morceaux.isEmpty else { return nil }
+        guard !reponses.isEmpty || !problemes.isEmpty else { return nil }
         let tous = reponses + problemes
-        return Attente(quoi: morceaux.joined(separator: " et "), n: tous.count,
+        return Attente(reponses: reponses.count, problemes: problemes.count, n: tous.count,
                        depuis: tous.compactMap(\.quand).filter { $0 <= maintenant }.min(), titres: tous.map(\.titre))
     }
 
-    /// « 1 réponse reçue et 1 problème attendent depuis 14:12 ».
-    static func phrase(_ a: Attente, maintenant: Date) -> String {
-        "\(a.quoi) \(a.n > 1 ? "attendent" : "attend")" + (a.depuis.map { " depuis \(Libelles.depuisLe($0, maintenant: maintenant))" } ?? "")
+    /// « 1 réponse reçue et 1 problème attendent depuis 14:12 ». `francais` : pour le texte envoyé à l'agent.
+    static func phrase(_ a: Attente, maintenant: Date, francais: Bool = false) -> String {
+        if francais {
+            return "\(a.quoi(francais: true)) \(a.n > 1 ? "attendent" : "attend")"
+                + (a.depuis.map { " depuis \(Libelles.depuisLe($0, maintenant: maintenant, francais: true))" } ?? "")
+        }
+        let quoi = a.quoi()
+        if let h = a.depuis.map({ Libelles.depuisLe($0, maintenant: maintenant) }) {
+            return a.n > 1 ? L("\(quoi) attendent depuis \(h)") : L("\(quoi) attend depuis \(h)")
+        }
+        return a.n > 1 ? L("\(quoi) attendent") : L("\(quoi) attend")
     }
 
     /// Le texte du bouton « Relancer X », envoyé par « Écrire à » quand Sacha clique Envoyer. Rien si l'agent travaille ou
@@ -805,9 +914,10 @@ enum Domaines {
     static func relance(_ d: Domaine, _ s: SourcesDomaines, _ e: EtatDomaine) -> String? {
         guard let a = attente(d, e, maintenant: s.maintenant) else { return nil }
         if let t = tenant(d, s), t.etat == "busy" || t.etat == "waiting" { return nil }
+        // Ce texte part à l'agent (Écrire à, par le Facteur) : français, la langue de ses sessions, quelle que soit celle de l'écran.
         let noms = a.titres.prefix(3).map { "« \(court($0, 40)) »" }.joined(separator: ", ")
         let plus = a.titres.count > 3 ? " et \(a.titres.count - 3) de plus" : ""
-        return "\(phrase(a, maintenant: s.maintenant)) : \(noms)\(plus). À traiter maintenant, puis dis-moi en une ligne où tu en es."
+        return "\(phrase(a, maintenant: s.maintenant, francais: true)) : \(noms)\(plus). À traiter maintenant, puis dis-moi en une ligne où tu en es."
     }
 
     /// Le texte du bouton « Relancer PILOTE » (09/11, Organisation) : des cartes du domaine attendent PILOTE. Toujours
@@ -816,10 +926,12 @@ enum Domaines {
         guard d != .pilote else { return nil }
         let els = [CaseDomaine.enCours, .prepare, .aFaire].flatMap { e.elements($0) }.filter { $0.attend == Domaine.pilote.agent }
         guard !els.isEmpty else { return nil }
-        let depuis = els.compactMap(\.quand).filter { $0 <= maintenant }.min().map { " depuis \(Libelles.depuisLe($0, maintenant: maintenant))" } ?? ""
+        // Texte pour PILOTE : français, comme la relance de l'agent (nom d'agent français aussi).
+        let depuis = els.compactMap(\.quand).filter { $0 <= maintenant }.min()
+            .map { " depuis \(Libelles.depuisLe($0, maintenant: maintenant, francais: true))" } ?? ""
         let noms = els.prefix(3).map { "« \(court($0.titre, 50)) »" }.joined(separator: ", ")
         let plus = els.count > 3 ? " et \(els.count - 3) de plus" : ""
-        return "\(d.agent) t'attend\(depuis) : \(noms)\(plus). Réponds-lui maintenant, puis dis-moi en une ligne où ça en est."
+        return "\(d.agentFrancais) t'attend\(depuis) : \(noms)\(plus). Réponds-lui maintenant, puis dis-moi en une ligne où ça en est."
     }
 
     /// 09/11 (Organisation) : du travail qui attend (réponse reçue, problème, travail d'agent en retard) se dit d'abord,
@@ -829,9 +941,12 @@ enum Domaines {
         if let a = attente(d, e, maintenant: s.maintenant) { return " · " + phrase(a, maintenant: s.maintenant) }
         let aFaire = section(e, aFairePar(d))
         if let p = aFaire.filter({ ($0.quand ?? .distantPast) > s.maintenant }).min(by: { $0.quand! < $1.quand! }), let q = p.quand {
-            return " · reprend \(Libelles.quand(q, maintenant: s.maintenant)) : « \(court(p.titre, 50)) »"
+            let quand = Libelles.quand(q, maintenant: s.maintenant), titre = court(p.titre, 50)
+            return " · " + L("reprend \(quand) : « \(titre) »")
         }
-        if !aFaire.isEmpty { return aFaire.count == 1 ? " · 1 à faire sans heure prévue, écris-lui" : " · \(aFaire.count) à faire sans heure prévue, écris-lui" }
+        if !aFaire.isEmpty {
+            return " · " + (aFaire.count == 1 ? L("1 à faire sans heure prévue, écris-lui") : L("\(aFaire.count) à faire sans heure prévue, écris-lui"))
+        }
         return ""
     }
 
@@ -839,7 +954,7 @@ enum Domaines {
 
     private static func app(_ s: SourcesDomaines, _ cases: inout [CaseDomaine: [ElementDomaine]], _ e: inout EtatDomaine) {
         guard let commits = s.commits else {
-            e.erreur = GitKryva.depot == nil ? "Aucun dépôt suivi : à régler dans reglages.json (depot_suivi)." : "Le dépôt suivi n'a pas pu être lu."
+            e.erreur = GitKryva.depot == nil ? L("Aucun dépôt suivi : à régler dans reglages.json (depot_suivi).") : L("Le dépôt suivi n'a pas pu être lu.")
             return
         }
         let limite = s.maintenant.addingTimeInterval(-7 * jour)
@@ -850,19 +965,19 @@ enum Domaines {
             if c.enLigne {
                 guard (c.le ?? .distantPast) > limite else { continue }
                 cases[.fait, default: []].append(ElementDomaine(id: "git:\(c.hash)", titre: titre,
-                                                                detail: "En ligne" + (c.le.map { " · \(Libelles.jourCourt($0))" } ?? ""),
+                                                                detail: L("En ligne") + (c.le.map { " · \(Libelles.jourCourt($0))" } ?? ""),
                                                                 quand: c.le, ton: .vert))
             } else if c.branche != "main" {
                 // 09/11 : sur une branche, rien ne part avec le push tant qu'App ne l'a pas fusionnée (une branche peut
                 // attendre la version suivante). Le nom de branche aide à reconnaître la même chose dite par une carte.
                 cases[.prepare, default: []].append(ElementDomaine(id: "git:\(c.hash)", titre: titre,
-                                                                   detail: "Prêt sur la branche \(c.branche), à fusionner par App",
+                                                                   detail: L("Prêt sur la branche \(c.branche), à fusionner par \(Domaine.app.agent)"),
                                                                    quand: c.le, ton: .ambre, agent: equipe, cle: c.branche))
             } else {
                 dansMain += 1
-                let part = s.push?.echeance.map { "part avec ton push \(Libelles.quand($0, maintenant: s.maintenant))" }
-                    ?? "attend ton push, pas encore prévu"
-                cases[.prepare, default: []].append(ElementDomaine(id: "git:\(c.hash)", titre: titre, detail: "Prêt dans main, \(part)",
+                let part = s.push?.echeance.map { L("part avec ton push \(Libelles.quand($0, maintenant: s.maintenant))") }
+                    ?? L("attend ton push, pas encore prévu")
+                cases[.prepare, default: []].append(ElementDomaine(id: "git:\(c.hash)", titre: titre, detail: L("Prêt dans main, \(part)"),
                                                                    quand: c.le, ton: .ambre, agent: equipe))
             }
         }
@@ -870,9 +985,12 @@ enum Domaines {
         if dansMain > 0 {
             let quand = s.push?.echeance
             let retard = quand.map { $0 < s.maintenant } ?? false
-            let detail = quand.map { (retard ? "En retard · prévu " : "Prévu ") + Libelles.quand($0, maintenant: s.maintenant) } ?? "Pas encore prévu"
+            let detail = quand.map { q -> String in
+                let le = Libelles.quand(q, maintenant: s.maintenant)
+                return retard ? L("En retard · prévu \(le)") : L("Prévu \(le)")
+            } ?? L("Pas encore prévu")
             let geste = quand.flatMap { $0 < finDuJour(s.maintenant) ? s.push.map { "rappel:\($0.id)" } : nil }
-            cases[.aFaire, default: []].append(ElementDomaine(id: "push", titre: "Taper « push » dans App (" + (dansMain == 1 ? "1 changement)" : "\(dansMain) changements)"),
+            cases[.aFaire, default: []].append(ElementDomaine(id: "push", titre: dansMain == 1 ? L("Taper « push » dans App (1 changement)") : L("Taper « push » dans App (\(dansMain) changements)"),
                                                               detail: detail, quand: quand, ton: retard ? .rouge : .ambre,
                                                               pourToi: true, geste: geste))
         }
@@ -934,7 +1052,7 @@ enum Domaines {
             switch p.etat {
             case "publie":
                 guard (quand ?? s.maintenant) > limite else { continue }
-                cases[.fait, default: []].append(ElementDomaine(id: "pub:\(p.id)", titre: titre, detail: "Publié · \(ou)",
+                cases[.fait, default: []].append(ElementDomaine(id: "pub:\(p.id)", titre: titre, detail: L("Publié · \(ou)"),
                                                                 quand: quand, lien: p.lien, ton: .vert))
             case "planifie", "envoi", "envoye":
                 // Dans la boîte TikTok : c'est Sacha qui publie (sa ligne de « À toi »).
@@ -944,10 +1062,10 @@ enum Domaines {
                                                                    ton: .ambre, pourToi: boite, geste: boite ? "tiktok:\(p.id)" : nil))
             case "a_valider":
                 cases[.prepare, default: []].append(ElementDomaine(id: "pub:\(p.id)", titre: titre,
-                                                                   detail: "Attend ta validation · \(ou)", quand: quand, ton: .ambre,
+                                                                   detail: L("Attend ta validation · \(ou)"), quand: quand, ton: .ambre,
                                                                    pourToi: true, geste: "publication:\(p.id)"))
             case "echec", "reconnexion":
-                let pourquoi = p.raison.isEmpty ? (p.etat == "reconnexion" ? "Compte à reconnecter" : "Envoi en échec") : p.raison
+                let pourquoi = p.raison.isEmpty ? (p.etat == "reconnexion" ? L("Compte à reconnecter") : L("Envoi en échec")) : p.raison
                 cases[.pasPuFaire, default: []].append(ElementDomaine(id: "pub:\(p.id)", titre: titre,
                                                                       detail: "\(pourquoi) · \(ou)", quand: quand, ton: .rouge))
             default:
@@ -969,10 +1087,10 @@ enum Domaines {
     /// TikTok attend son geste dans l'app.
     static func programme(_ p: Publication, maintenant: Date) -> String {
         let compte = nomCompte(p.compte)
-        let quand = p.prevu.map { Libelles.quand($0, maintenant: maintenant) } ?? "dès que possible"
-        if estDansBoiteTikTok(p) { return "Dans ta boîte TikTok, à publier par toi · prévue \(quand)" }
-        if p.compte.hasPrefix("tt") { return "Arrive dans ta boîte TikTok \(quand), à publier par toi" }
-        return "Part toute seule \(quand) · \(compte)"
+        let quand = p.prevu.map { Libelles.quand($0, maintenant: maintenant) } ?? L("dès que possible")
+        if estDansBoiteTikTok(p) { return L("Dans ta boîte TikTok, à publier par toi · prévue \(quand)") }
+        if p.compte.hasPrefix("tt") { return L("Arrive dans ta boîte TikTok \(quand), à publier par toi") }
+        return L("Part toute seule \(quand) · \(compte)")
     }
 
     // MARK: Ventes et Freelance : une ligne par personne
@@ -1029,37 +1147,48 @@ enum Domaines {
     static func ligne(_ c: ResumeContact, aujourdhui: String) -> String {
         var phrase = ""
         if c.echecs > 0 {
-            phrase = c.echecs == 1 ? "Un envoi n'est pas parti" : "\(c.echecs) envois ne sont pas partis"
+            phrase = c.echecs == 1 ? L("Un envoi n'est pas parti") : L("\(c.echecs) envois ne sont pas partis")
         } else if c.aValider > 0 {
-            phrase = c.aValider == 1 ? "Texte à valider" : "\(c.aValider) textes à valider"
+            phrase = c.aValider == 1 ? L("Texte à valider") : L("\(c.aValider) textes à valider")
         } else if c.prets > 0 {
-            phrase = (c.prets == 1 ? "Message prêt" : "\(c.prets) messages prêts") + ", à envoyer " + jourEnvoi(c.envoiLe, aujourdhui)
-            if c.envoiSousCondition { phrase += ", sous condition" }
+            let jour = jourEnvoi(c.envoiLe, aujourdhui)
+            phrase = c.prets == 1 ? L("Message prêt, à envoyer \(jour)") : L("\(c.prets) messages prêts, à envoyer \(jour)")
+            if c.envoiSousCondition { phrase += ", " + L("sous condition") }
         } else if c.aPartir > 0 {
-            phrase = "Texte en cours de réécriture"
+            phrase = L("Texte en cours de réécriture")
         } else if let le = Dates.iso.date(from: c.dernierLe) ?? Dates.jour.date(from: String(c.dernierLe.prefix(10))) {
             let canal = c.dernierCanal.isEmpty ? "" : " (\(Libelles.canal(c.dernierCanal)))"
+            let jour = Libelles.jourCourt(le)
             if c.dernierSens == "entrant" {
-                phrase = "A répondu le \(Libelles.jourCourt(le))\(canal)"
+                phrase = L("A répondu le \(jour)\(canal)")
+                if c.aucuneReponseDue { phrase += ", " + L("aucune réponse due") }
             } else {
-                phrase = "Message parti le \(Libelles.jourCourt(le))\(canal)"
-                if c.etape != "gagne" && c.etape != "perdu" { phrase += ", attend sa réponse" }
+                phrase = L("Message parti le \(jour)\(canal)")
+                if c.etape != "gagne" && c.etape != "perdu" { phrase += ", " + L("attend sa réponse") }
             }
         }
-        if let g = gesteSacha(c) {
-            var quand = ""
-            if let d = Dates.jour.date(from: c.prochaineDate), !g.contains(Libelles.jourCourt(d)) {
-                quand = c.prochaineDate < aujourdhui ? " (prévu le \(Libelles.jourCourt(d)))" : " (\(Libelles.jourCourt(d)))"
-            }
-            phrase += (phrase.isEmpty ? "" : " · ") + "Pour toi : \(g)\(quand)"
+        if let g = gestePersonne(c, aujourdhui: aujourdhui) {
+            phrase += (phrase.isEmpty ? "" : " · ") + L("Pour toi : \(g)")
         }
         return phrase
     }
 
+    /// Le geste de Sacha pour cette personne, sa date comprise : « Visio avec Arthur (mar. 10/11) » ; nil sans geste. Le
+    /// texte du geste est celui de l'agent (donnée, en français) ; la date n'est ajoutée que si le texte ne la dit pas.
+    static func gestePersonne(_ c: ResumeContact, aujourdhui: String) -> String? {
+        guard let g = gesteSacha(c) else { return nil }
+        var quand = ""
+        if let d = Dates.jour.date(from: c.prochaineDate), !g.contains(Libelles.jourCourt(d)) {
+            let jour = Libelles.jourCourt(d)
+            quand = c.prochaineDate < aujourdhui ? " (" + L("prévu le \(jour)") + ")" : " (\(jour))"
+        }
+        return g + quand
+    }
+
     /// « aujourd'hui » ou « le mar. 10/11 ».
     static func jourEnvoi(_ jour: String, _ aujourdhui: String) -> String {
-        guard !jour.isEmpty, jour > aujourdhui, let d = Dates.jour.date(from: jour) else { return "aujourd'hui" }
-        return "le " + Libelles.jourSemaine(d)
+        guard !jour.isEmpty, jour > aujourdhui, let d = Dates.jour.date(from: jour) else { return L("aujourd'hui") }
+        return L("le \(Libelles.jourSemaine(d))")
     }
 
     private static func personnes(_ s: SourcesDomaines, espace: String, _ cases: inout [CaseDomaine: [ElementDomaine]]) {
@@ -1068,13 +1197,13 @@ enum Domaines {
             guard var k = caseDe(c, aujourdhui: aujourdhui) else { continue }
             // Un texte en réécriture n'est ni prêt ni à Sacha : l'agent y travaille.
             if k == .prepare && c.aValider == 0 && c.prets == 0 { k = .enCours }
-            let nom = c.nom.isEmpty ? (c.entreprise.isEmpty ? "Sans nom" : c.entreprise) : nomEtEntreprise(c.nom, c.entreprise)
+            let nom = c.nom.isEmpty ? (c.entreprise.isEmpty ? L("Sans nom") : c.entreprise) : nomEtEntreprise(c.nom, c.entreprise)
             let ton: TonStatut
             switch k {
             case .pasPuFaire: ton = .rouge
             case .prepare, .enCours: ton = .ambre
             case .aFaire: ton = c.prochaineDate.isEmpty || c.prochaineDate > aujourdhui ? .gris : (c.prochaineDate < aujourdhui ? .rouge : .ambre)
-            default: ton = c.dernierSens == "entrant" ? .ambre : .vert
+            default: ton = c.dernierSens == "entrant" && !c.aucuneReponseDue ? .ambre : .vert
             }
             let quand = Dates.iso.date(from: c.dernierLe) ?? Dates.jour.date(from: String(c.dernierLe.prefix(10)))
             // Pour Sacha (09/11) : son geste écrit (« Sacha : … »), un texte à valider, ou des messages prêts à envoyer
@@ -1085,7 +1214,8 @@ enum Domaines {
             cases[k, default: []].append(ElementDomaine(id: "contact:\(c.id)", titre: nom,
                                                         detail: ligne(c, aujourdhui: aujourdhui),   // « Pour toi : … » y est déjà
                                                         quand: k == .aFaire ? Dates.jour.date(from: c.prochaineDate) : quand,
-                                                        contactId: c.id, ton: ton, pourToi: pourToi, geste: geste))
+                                                        contactId: c.id, ton: ton, pourToi: pourToi, geste: geste,
+                                                        gesteTexte: gestePersonne(c, aujourdhui: aujourdhui)))
         }
         if var prets = cases[.prepare] {
             let envoi = Dictionary(s.contacts.map { ("contact:\($0.id)", $0.envoiLe) }, uniquingKeysWith: { a, _ in a })
@@ -1102,7 +1232,7 @@ enum Domaines {
 
     private static func papiers(_ s: SourcesDomaines, _ cases: inout [CaseDomaine: [ElementDomaine]], _ e: inout EtatDomaine) {
         guard let taches = s.taches else {
-            e.erreur = "Les Rappels ne sont pas accessibles."
+            e.erreur = L("Les Rappels ne sont pas accessibles.")
             return
         }
         let limite = s.maintenant.addingTimeInterval(-7 * jour)
@@ -1110,11 +1240,11 @@ enum Domaines {
             if t.faite {
                 guard (t.faiteLe ?? .distantPast) > limite else { continue }
                 cases[.fait, default: []].append(ElementDomaine(id: "rappel:\(t.id)", titre: t.titre,
-                                                                detail: t.faiteLe.map { "Fait le \(Libelles.jourCourt($0))" } ?? "Fait",
+                                                                detail: t.faiteLe.map { L("Fait le \(Libelles.jourCourt($0))") } ?? L("Fait"),
                                                                 quand: t.faiteLe, ton: .vert))
             } else {
                 let retard = t.echeance.map { $0 < s.maintenant } ?? false
-                let detail = "Pour toi · " + (t.echeance.map { (retard ? "en retard, échéance " : "échéance ") + Libelles.jourCourt($0) } ?? "sans échéance")
+                let detail = L("Pour toi") + " · " + texteEcheance(t.echeance, retard: retard)
                 // Un ❓ de la liste Papiers : sa ligne dans À toi est « decision:<id> ».
                 var r = t; r.decision = Decisions.estDecision(t.titre)
                 cases[.aFaire, default: []].append(ElementDomaine(id: "rappel:\(t.id)", titre: titre(r), detail: detail,
@@ -1134,25 +1264,33 @@ enum Domaines {
     /// Sacha. Le travail des agents est dit par le bilan, avec les mêmes nombres que les sections dépliées.
     private static func pastilles(_ d: Domaine, _ e: EtatDomaine, _ s: SourcesDomaines) -> [PastilleStatut] {
         let pourToi = section(e, Self.pourToi)
-        guard !pourToi.isEmpty else { return [PastilleStatut(texte: "Rien à faire pour toi", ton: .gris)] }
+        guard !pourToi.isEmpty else { return [PastilleStatut(texte: L("Rien à faire pour toi"), ton: .gris)] }
         let retard = pourToi.filter { $0.ton == .rouge }
         let ton: TonStatut = retard.isEmpty ? .ambre : .rouge
         let geste = (retard + pourToi).first { $0.geste != nil }?.geste
-        if pourToi.count == 1 { return [PastilleStatut(texte: "Pour toi : \(court(gesteCourt(pourToi[0]), 70))", ton: ton, geste: geste)] }
-        var t = "\(pourToi.count) pour toi"
+        if pourToi.count == 1 {
+            let geste1 = court(gesteCourt(pourToi[0]), 70)
+            return [PastilleStatut(texte: L("Pour toi : \(geste1)"), ton: ton, geste: geste)]
+        }
+        let n = pourToi.count
+        let t: String
         if !retard.isEmpty {
-            t += retard.count == pourToi.count ? ", en retard" : ", dont \(retard.count) en retard"
+            t = retard.count == n ? L("\(n) pour toi, en retard") : L("\(n) pour toi, dont \(retard.count) en retard")
         } else if let q = pourToi.compactMap(\.quand).min() {
-            t += ", la 1re \(Libelles.quand(q, maintenant: s.maintenant))"
+            let quand = Libelles.quand(q, maintenant: s.maintenant)
+            t = L("\(n) pour toi, la 1re \(quand)")
+        } else {
+            t = L("\(n) pour toi")
         }
         return [PastilleStatut(texte: t, ton: ton, geste: geste)]
     }
 
     /// Le geste d'une ligne « Pour toi » en quelques mots : pour une personne, son geste écrit (« Visio avec Arthur… »).
     static func gesteCourt(_ el: ElementDomaine) -> String {
-        if el.geste?.hasPrefix("tiktok:") == true { return "Publier sur TikTok « \(court(el.titre, 50)) »" }
-        if el.geste?.hasPrefix("publication:") == true { return "Valider « \(court(el.titre, 50)) »" }
-        if el.contactId != nil, let r = el.detail.range(of: "Pour toi : ") { return String(el.detail[r.upperBound...]) }
+        if el.geste?.hasPrefix("tiktok:") == true { let t = court(el.titre, 50); return L("Publier sur TikTok « \(t) »") }
+        if el.geste?.hasPrefix("publication:") == true { let t = court(el.titre, 50); return L("Valider « \(t) »") }
+        // Le geste écrit d'une personne est un champ à part (`gesteTexte`) : on ne relit plus « Pour toi : » dans le texte affiché.
+        if el.contactId != nil, let g = el.gesteTexte { return g }
         if el.contactId != nil { return "\(el.titre), \(el.detail.prefix(1).lowercased() + el.detail.dropFirst())" }
         return el.titre
     }
@@ -1167,6 +1305,8 @@ extension Libelles {
     /// 09/11 (Organisation : « tout en tu / ton sur l'écran de Sacha ») : un texte de carte ou de rappel qui parle de Sacha à la
     /// 3e personne, dit à Sacha. Les tournures courantes seulement ; le reste passe tel quel.
     static func tutoyer(_ t: String) -> String {
+        // Les tournures sont françaises : en anglais et en espagnol la donnée (écrite en français par les agents) reste telle quelle.
+        guard Loc.estFrancais else { return t }
         guard let prenom = Moi.prenom, t.contains(prenom) else { return t }
         let moi = NSRegularExpression.escapedPattern(for: prenom)
         var r = t
@@ -1219,32 +1359,39 @@ extension Libelles {
     static let jourCourtFormat: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "dd/MM"; return f
     }()
-    static let jourHeureFormat: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "dd/MM 'à' HH:mm"; return f
-    }()
+    /// Le jour de la semaine en français (« mar. 10/11 ») : pour le français et pour les textes qu'on écrit aux agents.
     static let jourSemaineFormat: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "EEE dd/MM"; return f
     }()
     static let heureFormat: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "HH:mm"; return f
     }()
+    /// « 10/11 » : un jour numérique, pareil dans toutes les langues.
     static func jourCourt(_ d: Date) -> String { jourCourtFormat.string(from: d) }
-    static func jourHeure(_ d: Date) -> String { jourHeureFormat.string(from: d) }
-    /// « mar. 10/11 ».
-    static func jourSemaine(_ d: Date) -> String { jourSemaineFormat.string(from: d) }
+    /// « 10/11 à 14:05 ».
+    static func jourHeure(_ d: Date) -> String { L("\(jourCourt(d)) à \(heureFormat.string(from: d))") }
+    /// « mar. 10/11 » (« Tue 10/11 », « mar 10/11 ») ; `francais` : toujours le français, pour les textes écrits aux agents.
+    static func jourSemaine(_ d: Date, francais: Bool = false) -> String {
+        francais || Loc.estFrancais ? jourSemaineFormat.string(from: d) : Loc.date(d, "EEE") + " " + jourCourt(d)
+    }
     /// « aujourd'hui à 18:00 », « demain à 11:30 », « le jeu. 12/11 à 17:00 ».
     static func quand(_ d: Date, maintenant: Date = Date()) -> String {
         let cal = Calendar.current
         // Une date sans heure (minuit) ne dit pas « à 00:00 » (09/11 : « la 1re le lun. 23/11 à 00:00 »).
         let c = cal.dateComponents([.hour, .minute], from: d)
-        let heure = c.hour == 0 && c.minute == 0 ? "" : " à \(heureFormat.string(from: d))"
-        if cal.isDate(d, inSameDayAs: maintenant) { return "aujourd'hui\(heure)" }
-        if let demain = cal.date(byAdding: .day, value: 1, to: maintenant), cal.isDate(d, inSameDayAs: demain) { return "demain\(heure)" }
-        return "le \(jourSemaine(d))\(heure)"
+        let sansHeure = c.hour == 0 && c.minute == 0
+        let h = heureFormat.string(from: d)
+        if cal.isDate(d, inSameDayAs: maintenant) { return sansHeure ? L("aujourd'hui") : L("aujourd'hui à \(h)") }
+        if let demain = cal.date(byAdding: .day, value: 1, to: maintenant), cal.isDate(d, inSameDayAs: demain) {
+            return sansHeure ? L("demain") : L("demain à \(h)")
+        }
+        let jour = jourSemaine(d)
+        return sansHeure ? L("le \(jour)") : L("le \(jour) à \(h)")
     }
 
-    /// « 18 h », « 13 h 35 ».
+    /// « 18 h », « 13 h 35 » ; hors du français, l'heure en 24 h (« 18:00 »).
     static func heureCourte(_ d: Date) -> String {
+        guard Loc.estFrancais else { return heureFormat.string(from: d) }
         let c = Calendar.current.dateComponents([.hour, .minute], from: d)
         let h = c.hour ?? 0, m = c.minute ?? 0
         return m == 0 ? "\(h) h" : String(format: "%d h %02d", h, m)
@@ -1252,23 +1399,31 @@ extension Libelles {
 
     /// Depuis quand une chose attend : « 14:12 » (aujourd'hui), « hier 18:40 », « le jeu. 05/11 » ; sans heure (minuit) :
     /// « aujourd'hui », « hier ».
-    static func depuisLe(_ d: Date, maintenant: Date = Date()) -> String {
+    /// `francais` : le français quelle que soit la langue de l'écran, pour les textes écrits aux agents.
+    static func depuisLe(_ d: Date, maintenant: Date = Date(), francais: Bool = false) -> String {
         let cal = Calendar.current
         let c = cal.dateComponents([.hour, .minute], from: d)
         let sansHeure = c.hour == 0 && c.minute == 0
-        if cal.isDate(d, inSameDayAs: maintenant) { return sansHeure ? "aujourd'hui" : heureFormat.string(from: d) }
-        if let hier = cal.date(byAdding: .day, value: -1, to: maintenant), cal.isDate(d, inSameDayAs: hier) {
-            return sansHeure ? "hier" : "hier \(heureFormat.string(from: d))"
+        let h = heureFormat.string(from: d)
+        let aujourdhui = cal.isDate(d, inSameDayAs: maintenant)
+        let hier = cal.date(byAdding: .day, value: -1, to: maintenant).map { cal.isDate(d, inSameDayAs: $0) } ?? false
+        if francais {
+            if aujourdhui { return sansHeure ? "aujourd'hui" : h }
+            if hier { return sansHeure ? "hier" : "hier \(h)" }
+            return "le \(jourSemaine(d, francais: true))"
         }
-        return "le \(jourSemaine(d))"
+        if aujourdhui { return sansHeure ? L("aujourd'hui") : h }
+        if hier { return sansHeure ? L("hier") : L("hier \(h)") }
+        let jour = jourSemaine(d)
+        return L("le \(jour)")
     }
 
-    /// « 14 min », « 2 h », « 3 j ».
+    /// « 14 min », « 2 h », « 3 j » (une durée).
     static func depuis(_ d: Date, maintenant: Date = Date()) -> String {
         let s = max(0, maintenant.timeIntervalSince(d))
-        if s < 3600 { return "\(max(1, Int(s / 60))) min" }
-        if s < 86_400 { return "\(Int(s / 3600)) h" }
-        return "\(Int(s / 86_400)) j"
+        if s < 3600 { return L("\(max(1, Int(s / 60))) min") }
+        if s < 86_400 { return L("\(Int(s / 3600)) h") }
+        return L("\(Int(s / 86_400)) j")
     }
 }
 
@@ -1495,7 +1650,10 @@ extension Stockage {
               (SELECT count(*) FROM evenements e WHERE e.contact_id = c.id AND e.supprime_le = '' AND e.sens = 'entrant'
                  AND substr(e.le, 1, 10) >= ?) AS recus,
               (SELECT count(*) FROM evenements e WHERE e.contact_id = c.id AND e.supprime_le = '' AND e.statut = 'prepare') AS prets,
-              (SELECT count(*) FROM evenements e WHERE e.contact_id = c.id AND e.supprime_le = '' AND e.statut = 'a_valider') AS a_valider
+              (SELECT count(*) FROM evenements e WHERE e.contact_id = c.id AND e.supprime_le = '' AND e.statut = 'a_valider') AS a_valider,
+              -- 10/11 : « aucune réponse due » tient tant que le nombre de réponses reçues n'a pas bougé.
+              (c.aucune_reponse_due_recus >= 0 AND c.aucune_reponse_due_recus = (SELECT count(*) FROM evenements e
+                 WHERE e.contact_id = c.id AND e.supprime_le = '' AND e.sens = 'entrant')) AS rien_du
             FROM contacts c
             WHERE c.espace IN ('kryva', 'freelance') AND c.ne_plus_contacter = 0 AND c.supprime_le = ''
             """, [depuis, depuis, depuis])
@@ -1528,6 +1686,7 @@ extension Stockage {
                                   echecs: Self.entier(l["echecs"]), recus: Self.entier(l["recus"]))
             r.prets = Self.entier(l["prets"])
             r.aValider = Self.entier(l["a_valider"])
+            r.aucuneReponseDue = Self.entier(l["rien_du"]) == 1
             if let e = envois[id] { r.envoiLe = e.jour; r.envoiSousCondition = e.condition }
             return r
         }

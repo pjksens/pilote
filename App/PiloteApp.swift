@@ -19,6 +19,7 @@ struct PiloteApp: App {
                 .environment(etat)
                 .environment(agenda)
                 .environment(tableau)
+                .environment(\.locale, Loc.locale)
                 .frame(minWidth: 760, minHeight: 560)
                 .preferredColorScheme(apparence == "sombre" ? .dark : (apparence == "clair" ? .light : nil))
         }
@@ -51,6 +52,7 @@ struct PiloteApp: App {
             BarreMenusVue()
                 .environment(etat)
                 .environment(agenda)
+                .environment(\.locale, Loc.locale)
                 .environment(\.colorScheme, apparence == "sombre" ? .dark : .light)
         } label: {
             Label("\(aFaireAujourdhui)", systemImage: "location.north.fill").labelStyle(.titleAndIcon)
@@ -149,8 +151,7 @@ struct Racine: View {
             if let cle = DemainPret.cleNotification(maintenant) {
                 let b = etat.bilanDemain(agenda, maintenant: maintenant)
                 if b.complet, !b.trous.isEmpty {
-                    let titre = "Demain (\(DemainPret.libelleJour(b.jour))) pas prêt : "
-                        + (b.trous.count == 1 ? "1 trou" : "\(b.trous.count) trous")
+                    let titre = L("Demain (\(DemainPret.libelleJour(b.jour))) pas prêt : \(b.trous.count) trous")
                     Notifs.prevenir(cle: cle, titre: titre,
                                     corps: b.trous.prefix(3).map { "\($0.titre) : \($0.detail)" }.joined(separator: " · "))
                 }
@@ -163,11 +164,10 @@ struct Racine: View {
                     // Heure réelle de réveil du Mac (pmset -g log, ~10 s, hors du fil principal) : le brief n'est jamais « de 7 h » si le Mac dormait.
                     let reveil = await Task.detached { AlerteArret.reveilDuJour(maintenant: maintenant) }.value
                     let ligneReveil = reveil.map { r -> String in
-                        let f = DateFormatter(); f.locale = Locale(identifier: "fr_FR"); f.dateFormat = "HH:mm"
-                        return " · Mac réveillé à " + f.string(from: r)
+                        " · " + L("Mac réveillé à \(Loc.date(r, "HH:mm"))")
                     } ?? ""
-                    Notifs.prevenir(cle: cle, titre: "Votre journée (\(DemainPret.libelleJour(Dates.jour.string(from: maintenant)))) : "
-                                    + (n == 1 ? "1 chose prévue" : "\(n) choses prévues"), corps: MaJournee.resume(e) + ligneReveil)
+                    Notifs.prevenir(cle: cle, titre: L("Votre journée (\(DemainPret.libelleJour(Dates.jour.string(from: maintenant)))) : \(n) choses prévues"),
+                                    corps: MaJournee.resume(e) + ligneReveil)
                 }
             }
             // Le contrôle du suivi des prospects (04/11, Sacha : « on ne doit rien louper »), avec le brief de 7 h, une fois par jour.
@@ -177,27 +177,28 @@ struct Racine: View {
                let c = await Task.detached(operation: { try? stock.controle(envoisKryva: EnvoisKryva.lire(), verifierKryva: true, maintenant: maintenant) }).value,
                c.envoyesEncoreDus.count + c.dusSansTexte.count + c.datesSansSource.count + c.sansDate.count + c.envoyesDepuisKryva.count > 0 {
                 let n = c.envoyesEncoreDus.count + c.dusSansTexte.count + c.datesSansSource.count + c.sansDate.count + c.envoyesDepuisKryva.count
-                Notifs.prevenir(cle: "controle-" + cle, titre: "Suivi des prospects : " + (n == 1 ? "1 trou" : "\(n) trous"),
-                                corps: (c.envoyesDepuisKryva.isEmpty ? "" : "MAIL PARTI D'UN DOMAINE INTERDIT \(c.envoyesDepuisKryva.count) · ")
-                                    + "Dus sans texte \(c.dusSansTexte.count) · envoyés mais encore dus \(c.envoyesEncoreDus.count)"
-                                    + " · dates sans source \(c.datesSansSource.count) · sans date \(c.sansDate.count) · étapes sans fait \(c.etapesSansFait.count)"
-                                    + (c.sansDateAContacter.isEmpty ? "" : " · Stock à contacter : \(c.sansDateAContacter.count) (non compté)")
-                                    + ". `pilote controle` les liste.")
+                var morceaux: [String] = []
+                if !c.envoyesDepuisKryva.isEmpty { morceaux.append(L("MAIL PARTI D'UN DOMAINE INTERDIT \(c.envoyesDepuisKryva.count)")) }
+                morceaux.append(L("Dus sans texte \(c.dusSansTexte.count) · envoyés mais encore dus \(c.envoyesEncoreDus.count) · dates sans source \(c.datesSansSource.count) · sans date \(c.sansDate.count) · étapes sans fait \(c.etapesSansFait.count)"))
+                if !c.sansDateAContacter.isEmpty { morceaux.append(L("Stock à contacter : \(c.sansDateAContacter.count) (non compté)")) }
+                Notifs.prevenir(cle: "controle-" + cle, titre: L("Suivi des prospects : \(n) trous"),
+                                corps: morceaux.joined(separator: " · ") + ". " + L("`pilote controle` les liste."))
             }
             // 04/11 (GO de PILOTE) : capteur ou veille arrêtés depuis plus de 2 h de la plage 7 h-23 h, signalé une fois par jour
             // avec le brief ; depuis le 05/11 (T34) aussi en rouge en haut d'Aujourd'hui (etat.arrets).
             if let cle = MaJournee.cleNotification(maintenant) {
                 let arrets = arretsConfirmes
                 if !arrets.isEmpty {
-                    Notifs.prevenir(cle: "arret-" + cle, titre: "Pilote : un témoin est arrêté", corps: arrets.joined(separator: " · ") + ". `pilote controle` le dit aussi.")
+                    Notifs.prevenir(cle: "arret-" + cle, titre: L("Pilote : un témoin est arrêté"),
+                                    corps: arrets.joined(separator: " · ") + ". " + L("`pilote controle` le dit aussi."))
                 }
             }
             if let cle = SeanceDimanche.cleNotification(maintenant) {
                 let c = SeanceDimanche.creneaux(etat.videos, aujourdhui: Dates.jour.string(from: maintenant))
                 let reste = c.filter { !$0.choisi }.count
                 if reste > 0 {
-                    Notifs.prevenir(cle: cle, titre: "Séance du dimanche : " + (reste == 1 ? "1 sujet à choisir" : "\(reste) sujets à choisir"),
-                                    corps: "\(c.count - reste) sur \(c.count) choisis. Les propositions de Réseaux sont sur l'accueil, dans « À toi ».")
+                    Notifs.prevenir(cle: cle, titre: L("Séance du dimanche : \(reste) sujets à choisir"),
+                                    corps: L("\(c.count - reste) sur \(c.count) choisis. Les propositions de Réseaux sont sur l'accueil, dans « À toi »."))
                 }
             }
             try? await Task.sleep(for: .seconds(60))
@@ -232,10 +233,10 @@ struct Racine: View {
     /// Les décisions à prendre (❓ et questions des sessions) : une notification pour chaque nouvelle, et le Dock.
     private var annonces: [Notifs.Annonce] {
         agenda.rappels.filter { Decisions.estDecision($0.titre) }.map {
-            Notifs.Annonce(cle: $0.id, titre: "Décision à prendre", corps: Decisions.question($0.titre)
-                + " (pour \(Decisions.pour(liste: $0.liste, notes: $0.notes)))")
+            Notifs.Annonce(cle: $0.id, titre: L("Décision à prendre"),
+                           corps: L("\(Decisions.question($0.titre)) (pour \(Decisions.pour(liste: $0.liste, notes: $0.notes)))"))
         } + etat.questionsSessions.map {
-            Notifs.Annonce(cle: $0.questionRef, titre: "\(etat.nomSession($0)) vous demande", corps: $0.question)
+            Notifs.Annonce(cle: $0.questionRef, titre: L("\(etat.nomSession($0)) vous demande"), corps: $0.question)
         }
     }
 

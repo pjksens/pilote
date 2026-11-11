@@ -90,7 +90,7 @@ final class Stockage: @unchecked Sendable {
     /// un envoi passe « À contacter » à « Contacté », une réponse reçue passe à « A répondu ».
     @discardableResult
     func ajouterEvenement(contactId: String, _ champs: [String: Any]) throws -> Evenement {
-        guard let c = try contact(contactId) else { throw ErreurBase(description: "Contact introuvable : \(contactId)") }
+        guard let c = try contact(contactId) else { throw ErreurBase(description: L("Contact introuvable : \(contactId)")) }
         var champs = champs
         if champs["le"] == nil { champs["le"] = Dates.maintenant() }
         if let ref = Self.texte(champs["source_ref"]), !ref.isEmpty,
@@ -153,18 +153,47 @@ final class Stockage: @unchecked Sendable {
     static func verifierCondition(_ condition: String?, statut: String) throws {
         guard statut == "prepare", let condition, !condition.isEmpty,
               let defaut = Libelles.incoherenceJourSemaine(condition, aujourdhui: Dates.aujourdhui()) else { return }
-        throw ErreurBase(description: "Condition refusée, jour de semaine faux : \(defaut). Corriger la condition (rien n'a été écrit).")
+        throw ErreurBase(description: "Condition refusée, jour de semaine faux : \(defaut). Corriger la condition (rien n'a été écrit).")   // pour un agent (CLI), sur une condition écrite en français
     }
 
     func evenement(_ id: String) throws -> Evenement? {
         try base.lignes("SELECT * FROM evenements WHERE id = ? AND supprime_le = ''", [id]).first.map(Self.evenement)
     }
 
+    /// 10/11 (Organisation, demande de PILOTE) : la dernière réponse reçue n'appelle aucune réponse (« Merci » de fin, message
+    /// d'attente d'un support). La fiche sort de « Réponse reçue, à traiter » jusqu'au prochain message reçu, quelle que soit
+    /// sa date (on garde le nombre de réponses reçues couvertes). Le fil note la raison. Refus si le dernier échange n'est pas
+    /// une réponse reçue (même règle que Domaines : sortant ou entrant, envoyé ou fait, le plus récent).
+    @discardableResult
+    func marquerAucuneReponseDue(contactId: String, pourquoi: String, par: String) throws -> Evenement {
+        guard let c = try contact(contactId) else { throw ErreurBase(description: L("Contact introuvable : \(contactId)")) }
+        let raison = pourquoi.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raison.isEmpty else {
+            throw ErreurBase(description: "pourquoi manquant : dire en quelques mots pourquoi aucune réponse n'est due (« Merci » de fin, message d'attente du support…).")
+        }
+        let dernier = try base.lignes("""
+            SELECT sens FROM evenements WHERE contact_id = ? AND supprime_le = '' AND sens IN ('sortant', 'entrant')
+              AND statut IN ('envoye', 'fait') ORDER BY le DESC LIMIT 1
+            """, [c.id]).first?["sens"] as? String
+        guard dernier == "entrant" else {
+            throw ErreurBase(description: "Rien à marquer : le dernier échange avec \(c.nomAffiche) n'est pas une réponse reçue.")
+        }
+        let recus = Self.entier(try base.lignes(
+            "SELECT count(*) AS n FROM evenements WHERE contact_id = ? AND supprime_le = '' AND sens = 'entrant'", [c.id]).first?["n"])
+        try base.executer("UPDATE contacts SET aucune_reponse_due_recus = ? WHERE id = ?", [recus, c.id])
+        return try ajouterEvenement(contactId: c.id, ["canal": "autre", "sens": "interne", "type": "note", "statut": "fait",
+                                                      "texte": "Aucune réponse due : \(raison)", "par": par])
+    }
+
     /// Passe un message préparé à « envoyé » (ou « échec »), à l'heure où Sacha l'a envoyé.
     /// 05/11 (T7) : un message dont la condition n'est pas cochée ne passe pas à « envoyé » (erreur), sauf `malgreCondition` :
     /// le message est DÉJÀ parti (capteur, mail parti de Gmail, Sacha le dit) ; le fil le note et le rappel lié reste ouvert.
     func marquer(evenementId: String, statut: String, messageId: String = "", malgreCondition: Bool = false) throws {
-        guard let ligne = try base.lignes("SELECT * FROM evenements WHERE id = ?", [evenementId]).first else { return }
+        // Un identifiant inconnu (court, mal copié) ne doit jamais répondre « ok » : une session croirait le message
+        // marqué « envoyé » alors que non, et il risquerait de partir deux fois (bug vu le 09/11).
+        guard let ligne = try base.lignes("SELECT * FROM evenements WHERE id = ?", [evenementId]).first else {
+            throw ErreurBase(description: "Message introuvable : « \(evenementId) ». Donner l'identifiant complet (36 caractères), lu dans fiche.")   // pour un agent (CLI)
+        }
         var e = Self.evenement(ligne)
         let sansCondition = statut == "envoye" && e.statut != "envoye" && e.conditionEnAttente
         if sansCondition && !malgreCondition { throw ErreurBase(description: Self.refusCondition(e)) }
@@ -184,8 +213,7 @@ final class Stockage: @unchecked Sendable {
     }
 
     static func refusCondition(_ e: Evenement) -> String {
-        "Pas envoyé : la condition n'est pas cochée (« \(e.condition) »). La cocher d'abord (« Condition remplie » dans l'app, "
-            + "ou modifie_evenement avec condition_remplie), ou, si le message est déjà parti, le marquer avec malgre_condition."
+        L("Pas envoyé : la condition n'est pas cochée (« \(e.condition) »). La cocher d'abord (« Condition remplie » dans l'app, ou modifie_evenement avec condition_remplie), ou, si le message est déjà parti, le marquer avec malgre_condition.")
     }
 
     /// Effets d'un envoi sur le contact : étape « contacté » au moins, puis la suite de la routine (J+5 ouvrés après e.le).

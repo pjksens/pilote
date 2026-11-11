@@ -85,11 +85,12 @@ enum RadarCalcul {
         var ratio: Double?
         var raison: String?
         if p.vues == nil {
-            raison = "vues inconnues"
+            raison = L("vues inconnues")
         } else if refs.count < referencesMin {
-            raison = "\(refs.count) autre(s) post(s) de référence sur 30 jours, il en faut \(referencesMin)"
+            // Le 5 passe en texte : un seul nombre dans la phrase, celui qui commande le pluriel.
+            raison = L("\(refs.count) autre(s) post(s) de référence sur 30 jours, il en faut \(String(referencesMin))")
         } else if let med, med <= 0 {
-            raison = "médiane des autres posts à 0"
+            raison = L("médiane des autres posts à 0")
         } else if let med, let v = p.vues {
             ratio = Double(v) / med
         }
@@ -117,11 +118,11 @@ enum RadarCalcul {
         var exclus: [(Evaluation, String)] = []
         for e in evaluations {
             if e.ageHeures < fenetre.lowerBound {
-                exclus.append((e, "publié depuis moins de \(Int(fenetre.lowerBound)) h"))
+                exclus.append((e, L("publié depuis moins de \(Int(fenetre.lowerBound)) h")))
             } else if e.ageHeures > fenetre.upperBound {
-                exclus.append((e, "publié depuis plus de \(Int(fenetre.upperBound)) h"))
+                exclus.append((e, L("publié depuis plus de \(Int(fenetre.upperBound)) h")))
             } else if e.ratio == nil {
-                exclus.append((e, e.raison ?? "ratio indéterminé"))
+                exclus.append((e, e.raison ?? L("ratio indéterminé")))
             } else {
                 retenus.append(e)
             }
@@ -471,20 +472,20 @@ extension Stockage {
         let comptes = Set(posts.map(\.compteId)).count
         var avertissements: [String] = []
         let suivis = try radarComptes(espace: espace, etat: "actif").count
-        if simulation { avertissements.append("SIMULATION : chiffres fabriqués, ne rien en conclure.") }
+        if simulation { avertissements.append(L("SIMULATION : chiffres fabriqués, ne rien en conclure.")) }
         if suivis == 0 {
-            avertissements.append("Aucun compte suivi dans l'espace \(espace) (pilote radar compte-ajoute).")
+            avertissements.append(L("Aucun compte suivi dans l'espace \(espace) (pilote radar compte-ajoute)."))
         } else if posts.isEmpty {
-            avertissements.append("\(suivis) compte(s) suivi(s) mais aucun relevé : faire un scan ou « pilote radar importe ».")
+            avertissements.append(L("\(suivis) compte(s) suivi(s) mais aucun relevé : faire un scan ou « pilote radar importe »."))
         }
         if let dernier = posts.map(\.releveLe).max() {
             let h = maintenant.timeIntervalSince(dernier) / 3600
-            if h > 36 { avertissements.append("Dernier relevé il y a \(Int(h)) h : le classement décrit le passé, refaire un relevé avant d'en tirer un Top du jour.") }
+            if h > 36 { avertissements.append(L("Dernier relevé il y a \(Int(h)) h : le classement décrit le passé, refaire un relevé avant d'en tirer un Top du jour.")) }
         }
         let sansRef = Set(evaluations.filter { $0.post.vues != nil && $0.references < RadarCalcul.referencesMin }
             .map { "@" + ((details[$0.post.id]?["createur"] as? String) ?? $0.post.compteId) })
         if !sansRef.isEmpty {
-            avertissements.append("Pas de ratio pour \(sansRef.sorted().joined(separator: ", ")) : moins de \(RadarCalcul.referencesMin) autres posts sur 30 jours.")
+            avertissements.append(L("Pas de ratio pour \(sansRef.sorted().joined(separator: ", ")) : moins de \(RadarCalcul.referencesMin) autres posts sur 30 jours."))
         }
         return RadarClassement(
             espace: espace, simulation: simulation, calculeLe: Dates.iso.string(from: maintenant),
@@ -553,7 +554,7 @@ extension Stockage {
         if let l = try base.lignes("SELECT * FROM radar_idees WHERE post_id = ?", [postId]).first, let i = Self.radarIdee(l) { return (i, false) }
         let (posts, details) = try radarPostsVus(espace: espace, simulation: simulation)
         guard let p = posts.first(where: { $0.id == postId }), let d = details[postId] else {
-            throw ErreurRadar.introuvable("post « \(postId) » inconnu dans l'espace \(espace)")
+            throw ErreurRadar.introuvable(L("post « \(postId) » inconnu dans l'espace \(espace)"))
         }
         let e = RadarCalcul.evaluer(p, parmi: posts)
         let figee = RadarSourceFigee(
@@ -577,10 +578,10 @@ extension Stockage {
     /// (conflit), pour qu'une édition ne perde pas le travail d'une autre.
     @discardableResult
     func radarEcritIdee(id: String, brouillon: String?, concept: String? = nil, statut: String? = nil, revision: Int, maintenant: Date = Date()) throws -> RadarIdee {
-        guard let actuelle = try radarIdee(id) else { throw ErreurRadar.introuvable("idée « \(id) » inconnue") }
+        guard let actuelle = try radarIdee(id) else { throw ErreurRadar.introuvable(L("idée « \(id) » inconnue")) }
         if let s = statut, !RadarVocabulaire.statutsIdee.contains(s) { throw ErreurRadar.invalide("statut inconnu « \(s) » (a_ecrire, en_cours, pret)") }
         guard actuelle.revision == revision else {
-            throw ErreurRadar.conflit("conflit : l'idée est à la révision \(actuelle.revision), vous avez modifié la \(revision). Rien n'a été écrit ; relisez-la.")
+            throw ErreurRadar.conflit(L("conflit : l'idée est à la révision \(actuelle.revision), vous avez modifié la \(revision). Rien n'a été écrit ; relisez-la."))
         }
         try base.executer("""
             UPDATE radar_idees SET brouillon = ?, concept = ?, statut = ?, revision = revision + 1, maj_le = ? WHERE id = ? AND revision = ?

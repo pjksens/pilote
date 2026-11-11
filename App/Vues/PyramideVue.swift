@@ -27,7 +27,7 @@ struct PyramideCompacte: View {
             for n in c.chantiers { l.append(Rang(id: n.id, noeud: n, titre: "", niveau: 2)) }
         }
         if !pyramide.horsCarte.isEmpty {
-            l.append(Rang(id: "titre-hors-carte", noeud: nil, titre: "Hors carte (absentes d'EQUIPE.md)", niveau: 1))
+            l.append(Rang(id: "titre-hors-carte", noeud: nil, titre: L("Hors carte (absentes d'EQUIPE.md)"), niveau: 1))
             for n in pyramide.horsCarte { l.append(Rang(id: "hc-" + n.id, noeud: n, titre: "", niveau: 2)) }
         }
         return l
@@ -36,17 +36,17 @@ struct PyramideCompacte: View {
     private var resume: String? {
         guard charge, pyramide.pilote != nil else { return nil }
         let nb = pyramide.tous.filter(\.enLigne).count
-        return "\(nb) en ligne sur \(pyramide.tous.count)"
+        return L("\(nb) en ligne sur \(pyramide.tous.count)")
     }
 
     var body: some View {
-        Carte(titre: "Pyramide", detail: resume) {
+        Carte(titre: L("Pyramide"), detail: resume) {
             if !charge {
-                EtatChargement(texte: "Lecture de l'équipe…").padding(.horizontal, 16).padding(.bottom, 12)
+                EtatChargement(texte: L("Lecture de l'équipe…")).padding(.horizontal, 16).padding(.bottom, 12)
             } else if pyramide.pilote == nil {
                 EtatVide(texte: pyramide.fichierTrouve
-                         ? "EQUIPE.md ne contient pas de ligne PILOTE."
-                         : "EQUIPE.md est introuvable : \(Equipe.fichier.path)")
+                         ? L("EQUIPE.md ne contient pas de ligne PILOTE.")
+                         : L("EQUIPE.md est introuvable : \(Equipe.fichier.path)"))
             } else {
                 VStack(spacing: 0) {
                     ForEach(rangs) { r in
@@ -102,23 +102,25 @@ private struct LignePyramide: View {
         var l: [String] = []
         if !noeud.membre.domaine.isEmpty { l.append(noeud.membre.domaine) }
         if let a = noeud.activite {
-            if let p = etat.projet(pour: a.dossier) { l.append("Projet : \(p.nom)") }
+            if let p = etat.projet(pour: a.dossier) { l.append(L("Projet : \(p.nom)")) }
             if a.etat == "busy" {
-                if !a.demande.isEmpty { l.append("Demande : " + Equipe.court(a.demande, 400)) }
-                if !a.etape.isEmpty { l.append("Étape : " + Equipe.court(a.etape, 200)) }
+                if !a.demande.isEmpty { l.append(L("Demande : \(Equipe.court(a.demande, 400))")) }
+                if !a.etape.isEmpty { l.append(L("Étape : \(Equipe.court(a.etape, 200))")) }
                 if !a.action.isEmpty {
-                    l.append("Fait : " + Equipe.court(a.action, 200) + (a.actionLe.map { " (\(Equipe.heure($0)))" } ?? ""))
+                    let fait = Equipe.court(a.action, 200) + (a.actionLe.map { " (\(Equipe.heure($0)))" } ?? "")
+                    l.append(L("Fait : \(fait)"))
                 }
-                if let d = a.depuis { l.append("Au travail depuis \(Equipe.heure(d))") }
+                if let d = a.depuis { l.append(L("Au travail depuis \(Equipe.heure(d))")) }
             } else if !a.recap.isEmpty {
                 l.append(Equipe.court(a.recap, 400))
             }
         }
         if let d = noeud.dernier { l.append(d.texte + (d.quand.map { " (\(Equipe.heure($0)))" } ?? "")) }
-        if noeud.contexteK != nil { l.append("Le contexte est relu à chaque action. À partir de 130 k, une session de pilotage écrit sa passation et se remet à zéro.") }
-        if noeud.sousAgents > 0 { l.append("Sous-agents : estimation (fils modifiés depuis moins de \(Int(Equipe.fenetreSousAgents)) s et non marqués finis). Ce n'est pas une preuve.") }
-        if noeud.badges.contains("À valider puis archiver") { l.append("Au repos depuis plus de 24 h : à valider, puis à archiver à la main.") }
-        if !noeud.membre.sessionApp.isEmpty { l.append("Clic : ouvre la session dans l'app Claude.") }
+        if noeud.contexteK != nil { l.append(L("Le contexte est relu à chaque action. À partir de 130 k, une session de pilotage écrit sa passation et se remet à zéro.")) }
+        if noeud.sousAgents > 0 { l.append(L("Sous-agents : estimation (fils modifiés depuis moins de \(Int(Equipe.fenetreSousAgents)) s et non marqués finis). Ce n'est pas une preuve.")) }
+        // Même L des deux côtés : le badge est affiché tel que Equipe.badges l'écrit.
+        if noeud.badges.contains(L("À valider puis archiver")) { l.append(L("Au repos depuis plus de 24 h : à valider, puis à archiver à la main.")) }
+        if !noeud.membre.sessionApp.isEmpty { l.append(L("Clic : ouvre la session dans l'app Claude.")) }
         return l.joined(separator: "\n")
     }
 
@@ -156,7 +158,7 @@ private struct LignePyramide: View {
             ForEach(noeud.badges, id: \.self) { b in Pastille(texte: b, couleur: .ambre) }
             Spacer(minLength: 8)
             if noeud.sousAgents > 0 {
-                Text("≈ \(noeud.sousAgents) sous-agent\(noeud.sousAgents > 1 ? "s" : "")").font(.petit).foregroundStyle(Color.texte2)
+                Text(L("≈ \(noeud.sousAgents) sous-agents")).font(.petit).foregroundStyle(Color.texte2)
             }
             Text(noeud.contexteK.map { "\($0) k" } ?? "").font(.petit.monospacedDigit()).foregroundStyle(couleurContexte)
                 .frame(width: 44, alignment: .trailing)

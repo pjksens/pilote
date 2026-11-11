@@ -6,7 +6,7 @@ extension Etat {
     /// Le contrôle du jour ouvré suivant, avec ce que l'app a déjà lu (base, Rappels, décisions).
     func bilanDemain(_ agenda: Agenda, maintenant: Date = Date()) -> BilanDemain {
         let messages = (aEnvoyer + aValider + aRefaire).map {
-            MessageDemain(espace: $0.contact.espace, jour: $0.jour, statut: $0.evenement.statut, nom: $0.contact.nom)
+            MessageDemain(espace: $0.contact.espace, jour: $0.jour, statut: $0.evenement.statut, nom: $0.contact.nomAffiche)
         }
         let taches: [TacheDemain]? = agenda.tachesLues ? agenda.taches.compactMap { t in
             guard !t.faite, let e = t.echeance, CalendriersPlanning.tache(t.liste) else { return nil }
@@ -30,10 +30,14 @@ struct CarteDemain: View {
     var body: some View {
         let b = etat.bilanDemain(agenda)
         let trous = b.trous.count
-        Carte(titre: "Demain", detail: "\(DemainPret.libelleJour(b.jour)) · "
-              + (trous == 0 ? "tout est prêt" : (trous == 1 ? "1 trou" : "\(trous) trous") + " sur \(b.points.count)")) {
+        // Le texte qui part à une session reste en français : le contrôle est recalculé en français pour lui.
+        let enFrancais = Loc.estFrancais ? b : DemainPret.enFrancais { etat.bilanDemain(agenda) }
+        Carte(titre: L("Demain"), detail: "\(DemainPret.libelleJour(b.jour)) · "
+              + (trous == 0 ? L("tout est prêt") : L("\(trous) trous") + " " + L("sur \(b.points.count)"))) {
             ForEach(Array(b.points.enumerated()), id: \.element.id) { i, p in
-                LigneCarte(dernier: i == b.points.count - 1 && erreur == nil) { ligne(p, jour: b.jour) }
+                LigneCarte(dernier: i == b.points.count - 1 && erreur == nil) {
+                    ligne(p, enFrancais: enFrancais.points.first { $0.id == p.id } ?? p, jour: b.jour)
+                }
             }
             if let erreur { EtatErreur(texte: erreur).padding(.horizontal, 16).padding(.bottom, 10) }
             Text(b.dimanche ? "Contrôle du dimanche : demain et les sujets de la semaine. Notification à 19 h s'il manque quelque chose."
@@ -43,7 +47,7 @@ struct CarteDemain: View {
         }
     }
 
-    private func ligne(_ p: PointDemain, jour: String) -> some View {
+    private func ligne(_ p: PointDemain, enFrancais: PointDemain, jour: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: p.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(p.ok ? Color.vert : Color.rouge)
@@ -61,8 +65,8 @@ struct CarteDemain: View {
                         if prevenus.contains(p.id) {
                             Label("Prévenu", systemImage: "checkmark").font(.petit).foregroundStyle(Color.vert).fixedSize()
                         } else {
-                            Button("Prévenir") { prevenir(p, jour: jour, session: session) }.controlSize(.small)
-                                .help("Écrit à \(p.qui) : « \(texte(p, jour: jour)) ». Part avec le Facteur, sinon la veille.")
+                            Button("Prévenir") { prevenir(enFrancais, jour: jour, session: session) }.controlSize(.small)
+                                .help("Écrit à \(p.qui) : « \(texte(enFrancais, jour: jour)) ». Part avec le Facteur, sinon la veille.")
                         }
                     }
                 }
@@ -75,8 +79,11 @@ struct CarteDemain: View {
         etat.pyramide.tous.first { $0.membre.nom == nom && !$0.membre.sessionApp.isEmpty }?.membre.sessionApp
     }
 
+    /// La consigne envoyée à la session : en français, `p` est le point recalculé en français.
     private func texte(_ p: PointDemain, jour: String) -> String {
-        "Contrôle « Demain prêt ? » pour \(DemainPret.libelleJour(jour)) : \(p.titre), \(p.detail). À combler ce soir, puis mettre Pilote à jour."
+        DemainPret.enFrancais {
+            "Contrôle « Demain prêt ? » pour \(DemainPret.libelleJour(jour)) : \(p.titre), \(p.detail). À combler ce soir, puis mettre Pilote à jour."
+        }
     }
 
     private func prevenir(_ p: PointDemain, jour: String, session: String) {
@@ -84,6 +91,6 @@ struct CarteDemain: View {
             try etat.ecrire(a: p.qui, session: session, texte: texte(p, jour: jour), qui: "\(Moi.nom)")
             prevenus.insert(p.id)
             erreur = nil
-        } catch { erreur = "Pas écrit : \(error.localizedDescription)" }
+        } catch { erreur = L("Pas écrit : \(error.localizedDescription)") }
     }
 }

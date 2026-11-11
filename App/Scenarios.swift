@@ -173,7 +173,7 @@ final class Scenario {
         await cliquer()
         // « Choix noté : SMS · Annuler », puis la réponse attend son envoi sur la ligne « Envoyer ».
         await pause(Self.annulation + 1.0)
-        await aller(.repere("geste:Envoyer"))
+        await aller(.repere("geste:\(L("Envoyer"))"))
         await cliquer()
         await pause(Self.annulation + 0.8)
         // En vrai, le Facteur (scripts/facteur.py) remet la réponse en quelques secondes ; la démo la marque remise.
@@ -195,16 +195,14 @@ final class Scenario {
         await pause(1.4)
         etat.ecran = .aujourdhui
         await pause(1.2)
-        await aller(.repere("domaine:app"))
-        await cliquer()
-        await pause(1.2)
+        // Le domaine « App » est déjà déplié (PILOTE_DEPLIER=app, posé par scripts/demo.sh pour ce scénario).
         await aller(.repere("ecrire:app"))
         await cliquer()
         await pause(0.8)
         await aller(.repere("champ:app"))
         await cliquer()
         await pause(0.4)
-        await taper("Ajoute le mode sombre à la page Réglages, puis montre-moi la capture.")
+        await taper(Loc.langue == "en" ? "Add dark mode to the Settings page, then show me a screenshot." : Loc.langue == "es" ? "Añade el modo oscuro a la página de Ajustes y enséñame una captura." : "Ajoute le mode sombre à la page Réglages, puis montre-moi la capture.")
         await pause(0.8)
         await aller(.repere("envoyer:app"))
         await cliquer()

@@ -103,9 +103,10 @@ enum EnvoiPilote {
 
     // MARK: Refus
 
-    static func nomContact(_ c: Contact) -> String {
+    /// `francais` : le nom part dans la base (file d'envoi) : le « (sans nom) » reste en français.
+    static func nomContact(_ c: Contact, francais: Bool = false) -> String {
         let n = c.nom.trimmingCharacters(in: .whitespaces), e = c.entreprise.trimmingCharacters(in: .whitespaces)
-        if n.isEmpty { return e.isEmpty ? "(sans nom)" : e }
+        if n.isEmpty { return e.isEmpty ? (francais ? "(sans nom)" : L("(sans nom)")) : e }
         return e.isEmpty || e == n ? n : "\(n) (\(e))"
     }
 
@@ -115,43 +116,56 @@ enum EnvoiPilote {
             && !a.hasPrefix("@") && !a.hasSuffix("@")
     }
 
+    /// Le texte d'un refus : dans la langue de l'app (la feuille « Envoyer les mails validés »), ou, avec `francais`, toujours
+    /// en français (ce qui s'écrit dans la base ou part vers un agent). Sans catalogue (l'outil `pilote`) : le français aussi.
+    private static func traducteur(_ francais: Bool) -> (LocalizedStringResource) -> String {
+        francais ? { r in var r = r; r.locale = Locale(identifier: "fr"); return Loc.prenomRegle(String(localized: r)) } : { r in L(r) }
+    }
+
+    /// Le refus propre au canal : seuls les mails partent d'ici. nil pour un mail. Pour un SMS ou un DM, c'est la seule raison
+    /// qui compte (`aEnvoyer`) : un champ à part, plus un texte relu par son début.
+    static func refusCanal(_ e: Evenement, francais: Bool = false) -> String? {
+        guard e.canal != "mail" else { return nil }
+        let t = traducteur(francais)
+        return t("canal « \(e.canal) », pas « mail » : pilote n'envoie que les mails (les autres s'envoient à la main, puis « envoye »)")
+    }
+
     /// Pourquoi ce message ne peut pas partir (vide : il peut). Lu sur la base à jour, juste avant l'envoi.
-    static func refus(_ e: Evenement?, _ c: Contact?, expediteur: String?, motDePassePresent: Bool) -> [String] {
-        guard let e else { return ["message introuvable (ou supprimé)"] }
+    static func refus(_ e: Evenement?, _ c: Contact?, expediteur: String?, motDePassePresent: Bool, francais: Bool = false) -> [String] {
+        let t = traducteur(francais)
+        guard let e else { return [t("message introuvable (ou supprimé)")] }
         var r: [String] = []
         if e.statut == "envoye" || !e.messageId.isEmpty {
-            r.append("déjà envoyé" + (e.le.isEmpty ? "" : " (\(Dates.court(e.le)))") + " : il ne repart pas")
+            r.append(e.le.isEmpty ? t("déjà envoyé : il ne repart pas")
+                                  : t("déjà envoyé (\(Dates.court(e.le, francais: francais))) : il ne repart pas"))
         } else if e.statut != "prepare" {
-            r.append("statut « \(e.statut) », pas « prepare » : seul un message dont \(Moi.nom) a validé le texte exact peut partir")
+            r.append(t("statut « \(e.statut) », pas « prepare » : seul un message dont Sacha a validé le texte exact peut partir"))
         }
-        if e.sens != "sortant" { r.append("ce n'est pas un message sortant (sens « \(e.sens) »)") }
-        if e.canal != "mail" {
-            r.append("canal « \(e.canal) », pas « mail » : pilote n'envoie que les mails (les autres s'envoient à la main, puis « envoye »)")
-        }
+        if e.sens != "sortant" { r.append(t("ce n'est pas un message sortant (sens « \(e.sens) »)")) }
+        if let canal = refusCanal(e, francais: francais) { r.append(canal) }
         if e.objet.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            r.append("objet vide : un mail part toujours avec un objet (modifie_evenement, champ objet)")
+            r.append(t("objet vide : un mail part toujours avec un objet (modifie_evenement, champ objet)"))
         }
-        if e.texte.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { r.append("texte vide") }
+        if e.texte.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { r.append(t("texte vide")) }
         if e.conditionEnAttente {
-            r.append("condition pas cochée (« \(e.condition.trimmingCharacters(in: .whitespacesAndNewlines)) ») : la cocher d'abord "
-                     + "(pilote condition-remplie, ou modifie_evenement avec condition_remplie), seulement quand elle est vraie")
+            r.append(t("condition pas cochée (« \(e.condition.trimmingCharacters(in: .whitespacesAndNewlines)) ») : la cocher d'abord (pilote condition-remplie, ou modifie_evenement avec condition_remplie), seulement quand elle est vraie"))
         }
         if let c {
-            if c.nePlusContacter { r.append("\(nomContact(c)) est « ne plus contacter » : aucun envoi, jamais") }
+            if c.nePlusContacter { r.append(t("\(nomContact(c, francais: francais)) est « ne plus contacter » : aucun envoi, jamais")) }
             let a = c.email.trimmingCharacters(in: .whitespaces)
-            if a.isEmpty { r.append("pas d'adresse mail sur la fiche de \(nomContact(c))") }
-            else if !adresseLisible(a) { r.append("adresse mail illisible sur la fiche (« \(a) ») : une seule adresse attendue") }
-            else if EnvoisKryva.estInterdit(a) { r.append("destinataire dans un domaine interdit (\(a)) : refusé") }
+            if a.isEmpty { r.append(t("pas d'adresse mail sur la fiche de \(nomContact(c, francais: francais))")) }
+            else if !adresseLisible(a) { r.append(t("adresse mail illisible sur la fiche (« \(a) ») : une seule adresse attendue")) }
+            else if EnvoisKryva.estInterdit(a) { r.append(t("destinataire dans un domaine interdit (\(a)) : refusé")) }
         } else {
-            r.append("contact introuvable (ou supprimé)")
+            r.append(t("contact introuvable (ou supprimé)"))
         }
         if let de = expediteur?.trimmingCharacters(in: .whitespaces), !de.isEmpty {
-            if EnvoisKryva.estInterdit(de) { r.append("expéditeur dans un domaine interdit (\(de)) : jamais d'envoi depuis ce domaine") }
+            if EnvoisKryva.estInterdit(de) { r.append(t("expéditeur dans un domaine interdit (\(de)) : jamais d'envoi depuis ce domaine")) }
             else if !motDePassePresent {
-                r.append("mot de passe d'application Gmail absent du trousseau (\(de)) : « Connecter Gmail » dans l'app, une fois")
+                r.append(t("mot de passe d'application Gmail absent du trousseau (\(de)) : « Connecter Gmail » dans l'app, une fois"))
             }
         } else {
-            r.append("Gmail n'est pas connecté à Pilote (aucune adresse d'envoi) : « Connecter Gmail » dans l'app, une fois")
+            r.append(t("Gmail n'est pas connecté à Pilote (aucune adresse d'envoi) : « Connecter Gmail » dans l'app, une fois"))
         }
         return r
     }
@@ -233,7 +247,7 @@ enum EnvoiPilote {
         let c = try e.flatMap { try stock.contact($0.contactId) }
         let de = outils.expediteur()?.trimmingCharacters(in: .whitespaces)
         let present = de.map { !$0.isEmpty && outils.motDePassePresent($0) } ?? false
-        let raisons = refus(e, c, expediteur: de, motDePassePresent: present)
+        let raisons = refus(e, c, expediteur: de, motDePassePresent: present, francais: true)   // pour un agent et la base : français
         guard raisons.isEmpty, let e, let c, let de else { throw RefusEnvoi(evenementId: id, raisons: raisons) }
         let mail = preparer(e, c, de: de, dernierRecu: outils.dernierRecu)
         if let attendue = attendue?.trimmingCharacters(in: .whitespaces), !attendue.isEmpty, attendue != mail.empreinte {
@@ -266,7 +280,7 @@ enum EnvoiPilote {
 
     static func etatCondition(_ e: Evenement) -> String {
         if e.condition.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "aucune" }
-        return e.conditionOkLe.isEmpty ? "à cocher" : "cochée le \(Dates.court(e.conditionOkLe))"
+        return e.conditionOkLe.isEmpty ? "à cocher" : "cochée le \(Dates.court(e.conditionOkLe, francais: true))"
     }
 
     /// Les messages « prepare » (tous canaux), du plus ancien au plus récent, avec ce que `pilote envoie` en dirait.
@@ -275,7 +289,7 @@ enum EnvoiPilote {
         let present = de.map { !$0.isEmpty && outils.motDePassePresent($0) } ?? false
         return try stock.aEnvoyer().map { e, c in
             var r = refus(e, c, expediteur: de, motDePassePresent: present)
-            if e.canal != "mail" { r = r.filter { $0.hasPrefix("canal") } }   // un SMS ou un DM : seule la raison du canal compte
+            if e.canal != "mail" { r = refusCanal(e).map { [$0] } ?? [] }   // un SMS ou un DM : seule la raison du canal compte
             let debut = e.texte.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
             return EnvoiEnAttente(id: String(e.id.prefix(8)), evenementId: e.id, contact: nomContact(c), contactId: c.id, canal: e.canal,
                                  objet: e.objet, debut: debut.count > 100 ? String(debut.prefix(100)) + "…" : debut,

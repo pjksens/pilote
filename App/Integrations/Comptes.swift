@@ -21,24 +21,24 @@ enum StatutCompte: String {
     case inscrit, essai, essaiResilie, payant, abonne, souci, aVerifier
     var libelle: String {
         switch self {
-        case .inscrit: "Inscrit"
-        case .essai: "En essai"
-        case .essaiResilie: "Essai résilié"
-        case .payant: "Payant"
-        case .abonne: "Abonné app"
-        case .souci: "Paiement en souci"
-        case .aVerifier: "À vérifier"
+        case .inscrit: L("Inscrit")
+        case .essai: L("En essai")
+        case .essaiResilie: L("Essai résilié")
+        case .payant: L("Payant")
+        case .abonne: L("Abonné app")
+        case .souci: L("Paiement en souci")
+        case .aVerifier: L("À vérifier")
         }
     }
     var detail: String {
         switch self {
-        case .inscrit: "Compte sans abonnement en cours (Stripe et stores)."
-        case .essai: "Essai Stripe en cours."
-        case .essaiResilie: "Essai Stripe résilié : il s'arrête à la fin de la période."
-        case .payant: "Abonnement Stripe actif."
-        case .abonne: "Abonnement Apple ou Google en cours : essai ou payant, le store ne le dit pas ici."
-        case .souci: "Abonnement Stripe impayé ou incomplet."
-        case .aVerifier: "Abonnement Stripe présent mais non lu (Stripe injoignable ?)."
+        case .inscrit: L("Compte sans abonnement en cours (Stripe et stores).")
+        case .essai: L("Essai Stripe en cours.")
+        case .essaiResilie: L("Essai Stripe résilié : il s'arrête à la fin de la période.")
+        case .payant: L("Abonnement Stripe actif.")
+        case .abonne: L("Abonnement Apple ou Google en cours : essai ou payant, le store ne le dit pas ici.")
+        case .souci: L("Abonnement Stripe impayé ou incomplet.")
+        case .aVerifier: L("Abonnement Stripe présent mais non lu (Stripe injoignable ?).")
         }
     }
 }
@@ -58,8 +58,8 @@ enum Comptes {
         case script(String), reseau
         var errorDescription: String? {
             switch self {
-            case .script: return "Le compteur n'a pas pu tourner."
-            case .reseau: return "La base des comptes n'a pas répondu."
+            case .script: return L("Le compteur n'a pas pu tourner.")
+            case .reseau: return L("La base des comptes n'a pas répondu.")
             }
         }
     }

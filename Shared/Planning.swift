@@ -36,13 +36,13 @@ struct NotesPlanning: Hashable {
         let propre = texte.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{202F}", with: " ")
         for brute in propre.components(separatedBy: .newlines) {
             let ligne = brute.trimmingCharacters(in: .whitespaces)
-            if let reste = champ(ligne, #"but"#) {
+            if let reste = champ(ligne, #"but|goal|objetivo"#) {
                 n.but = reste.isEmpty ? nil : reste
                 dansDocs = false
-            } else if let reste = champ(ligne, #"docs?"#) {
+            } else if let reste = champ(ligne, #"docs?|documents?|documentos?"#) {
                 dansDocs = true
                 if let l = lien(reste) { n.docs.append(l) }
-            } else if let reste = champ(ligne, #"fini\s+quand"#) {
+            } else if let reste = champ(ligne, #"fini\s+quand|done\s+when|hecho\s+cuando"#) {
                 n.finiQuand = reste.isEmpty ? nil : reste
                 dansDocs = false
             } else if dansDocs, let l = lien(ligne) {
@@ -52,9 +52,10 @@ struct NotesPlanning: Hashable {
         return n
     }
 
-    /// « Nom : reste » (casse et espaces indifférents) → le reste.
+    /// « Nom : reste » (casse et espaces indifférents) → le reste. Les noms sont ceux de l'écran dans chaque langue :
+    /// « But », « Goal », « Objetivo »… (l'étiquette affichée est traduite, ce qu'on tape dans les notes doit se relire).
     private static func champ(_ ligne: String, _ nom: String) -> String? {
-        guard let r = ligne.range(of: "^" + nom + #"\s*:\s*"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
+        guard let r = ligne.range(of: "^(?:" + nom + #")\s*:\s*"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
         return String(ligne[r.upperBound...]).trimmingCharacters(in: .whitespaces)
     }
 

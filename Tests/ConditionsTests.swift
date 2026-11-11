@@ -37,6 +37,12 @@ final class ConditionsTests: XCTestCase {
         XCTAssertEqual(try s.evenement(e)?.statut, "prepare")
     }
 
+    func testUnIdentifiantInconnuEstRefuse() throws {
+        let (_, e) = try prepare()
+        XCTAssertThrowsError(try s.marquer(evenementId: String(e.prefix(8)), statut: "envoye"))   // id court : refusé, pas « ok »
+        XCTAssertEqual(try s.evenement(e)?.statut, "prepare")
+    }
+
     func testConditionCocheeDebloqueEtSeNoteAuFil() throws {
         let (c, e) = try prepare(condition: "après le test de l'acompte", rappel: "x-apple-reminder://ABC-123")
         XCTAssertTrue(try s.rappelsAFermer().isEmpty)

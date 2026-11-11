@@ -72,7 +72,7 @@ final class Synchro {
             if maj > plusRecent { plusRecent = maj }
             do {
                 if try appliquerContact(ligne) { bilan.contactsRecus += 1; recus.insert(id) }
-            } catch { bilan.ignores += 1; bilan.erreurs.append("contact \(id) : \(error)") }
+            } catch { bilan.ignores += 1; let detail = "\(error)"; bilan.erreurs.append(L("contact \(id) : \(detail)")) }
         }
         for ligne in try lire(tableEvenements, depuis: depuis) {
             guard let id = ligne["id"] as? String else { continue }
@@ -80,7 +80,7 @@ final class Synchro {
             if maj > plusRecent { plusRecent = maj }
             do {
                 if try appliquerEvenement(ligne, envoisRecus: &envoisRecus) { bilan.evenementsRecus += 1; recus.insert(id) }
-            } catch { bilan.ignores += 1; bilan.erreurs.append("événement \(id) : \(error)") }
+            } catch { bilan.ignores += 1; let detail = "\(error)"; bilan.erreurs.append(L("événement \(id) : \(detail)")) }
         }
         recus.subtract(envoisRecus)
         if !plusRecent.isEmpty { try poserEtat("derniere_lecture", plusRecent) }
@@ -221,7 +221,7 @@ final class Synchro {
     }
 
     private func upsert(_ table: String, _ lignes: [[String: Any]]) -> String? {
-        guard let corps = try? JSONSerialization.data(withJSONObject: lignes) else { return "JSON impossible" }
+        guard let corps = try? JSONSerialization.data(withJSONObject: lignes) else { return L("JSON impossible") }
         let r = requete("POST", "\(table)?on_conflict=id", corps: corps,
                         entetes: ["Prefer": "resolution=merge-duplicates,return=minimal"])
         if let e = r.erreur { return e }
@@ -237,9 +237,10 @@ final class Synchro {
             var chemin = "\(table)?select=*&order=maj_le.asc,id.asc&limit=1000&offset=\(offset)"
             if !depuis.isEmpty { chemin += "&maj_le=gt.\(depuis)" }
             let r = requete("GET", chemin)
-            if let e = r.erreur { throw ErreurBase(description: "Lecture \(table) : \(e)") }
+            if let e = r.erreur { throw ErreurBase(description: L("Lecture \(table) : \(e)")) }
             guard r.code == 200, let page = try JSONSerialization.jsonObject(with: r.data) as? [[String: Any]] else {
-                throw ErreurBase(description: "Lecture \(table) : HTTP \(r.code) \(String(data: r.data, encoding: .utf8)?.prefix(300) ?? "")")
+                let code = "HTTP \(r.code) \(String(data: r.data, encoding: .utf8)?.prefix(300) ?? "")"
+                throw ErreurBase(description: L("Lecture \(table) : \(code)"))
             }
             out += page
             if page.count < 1000 { return out }
@@ -249,7 +250,7 @@ final class Synchro {
 
     private func requete(_ methode: String, _ chemin: String, corps: Data? = nil, entetes: [String: String] = [:]) -> Reponse {
         let rep = Reponse()
-        guard let u = URL(string: "\(url)/rest/v1/\(chemin)") else { rep.erreur = "adresse invalide"; return rep }
+        guard let u = URL(string: "\(url)/rest/v1/\(chemin)") else { rep.erreur = L("adresse invalide"); return rep }
         var req = URLRequest(url: u, timeoutInterval: 30)
         req.httpMethod = methode
         req.setValue(cle, forHTTPHeaderField: "apikey")

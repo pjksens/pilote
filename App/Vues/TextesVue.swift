@@ -62,7 +62,7 @@ struct CarteTexte: View {
 
     private var entete: some View {
         HStack(spacing: 8) {
-            Pastille(texte: e.canal == "mail" ? "Mail" : (e.canal == "instagram" ? "DM Instagram" : Libelles.canal(e.canal)), couleur: .action)
+            Pastille(texte: e.canal == "mail" ? "Mail" : (e.canal == "instagram" ? L("DM Instagram") : Libelles.canal(e.canal)), couleur: .action)
             Button { etat.ouvrir(c) } label: { Text(c.titre).font(.ligneForte).foregroundStyle(Color.texte) }.buttonStyle(.plain)
             if e.canal != "mail", !e.objet.isEmpty {
                 Text(e.objet).font(.secondaire).foregroundStyle(Color.texte2)
@@ -103,7 +103,7 @@ struct CarteTexte: View {
         .controlSize(.regular)
     }
 
-    private func colonne<C: View>(_ titre: String, @ViewBuilder _ contenu: () -> C) -> some View {
+    private func colonne<C: View>(_ titre: LocalizedStringKey, @ViewBuilder _ contenu: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titre).font(.petit.weight(.semibold)).foregroundStyle(Color.texte2)
             contenu()

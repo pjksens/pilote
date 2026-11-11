@@ -102,7 +102,7 @@ struct ProspectsVue: View {
                 .help("\(perdus) perdus, \(stop) à ne plus contacter. « Tous les contacts », dans Plus, les montre.")
             TextField("Chercher", text: $recherche).textFieldStyle(.roundedBorder).frame(width: 170)
                 .help("Nom, entreprise, ville, notes")
-            let nouveau = groupe == "clients" ? "Nouveau client" : "Nouveau partenaire"
+            let nouveau = groupe == "clients" ? L("Nouveau client") : L("Nouveau partenaire")
             Button {
                 etat.nouveauContact(espace: espace, type: groupe == "clients" ? (espace == "kryva" ? "artisan" : "client") : "partenaire")
             } label: { Image(systemName: "plus") }
@@ -118,14 +118,25 @@ struct ProspectsVue: View {
     private func statutsKryva(_ contacts: [Contact]) -> some View {
         let statuts = contacts.compactMap { $0.orgId.isEmpty ? nil : (etat.statutsComptes[$0.orgId] ?? .inscrit) }
         let n = { (s: StatutCompte) in statuts.filter { $0 == s }.count }
-        let morceaux = [(StatutCompte.payant, "payant"), (.essai, "en essai"), (.essaiResilie, "essai résilié"), (.abonne, "abonné app"),
-                        (.souci, "en souci"), (.aVerifier, "à vérifier"), (.inscrit, "inscrit")]
-            .compactMap { s, mot in n(s) > 0 ? "\(n(s)) \(mot)\(n(s) > 1 && (s == .payant || s == .inscrit) ? "s" : "")" : nil }
+        // Une phrase entière par statut, avec le nombre : l'accord (payant / payants) vient du catalogue.
+        func phrase(_ s: StatutCompte, _ k: Int) -> String {
+            switch s {
+            case .payant: return L("\(k) payants")
+            case .essai: return L("\(k) en essai")
+            case .essaiResilie: return L("\(k) essai résilié")
+            case .abonne: return L("\(k) abonné app")
+            case .souci: return L("\(k) en souci")
+            case .aVerifier: return L("\(k) à vérifier")
+            case .inscrit: return L("\(k) inscrits")
+            }
+        }
+        let morceaux = [StatutCompte.payant, .essai, .essaiResilie, .abonne, .souci, .aVerifier, .inscrit]
+            .compactMap { s in n(s) > 0 ? phrase(s, n(s)) : nil }
         return Text(morceaux.joined(separator: " · ")).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
-            .help(etat.erreurStatutsComptes ?? "Statuts des comptes, relus toutes les 5 minutes (module comptes et Stripe, lecture seule).")
+            .help(etat.erreurStatutsComptes ?? L("Statuts des comptes, relus toutes les 5 minutes (module comptes et Stripe, lecture seule)."))
     }
 
-    private func pointLegende(_ c: Color, _ t: String) -> some View {
+    private func pointLegende(_ c: Color, _ t: LocalizedStringKey) -> some View {
         HStack(spacing: 4) {
             Circle().fill(c).frame(width: 8, height: 8)
             Text(t).font(.petit).foregroundStyle(Color.texte2)
@@ -152,7 +163,8 @@ struct ProspectsVue: View {
                     .draggable(c.id)
             }
             if cartes.count > parColonne {
-                Button(deplie ? "Replier" : "+ \(cartes.count - parColonne) autre\(cartes.count - parColonne > 1 ? "s" : "")") {
+                let reste = cartes.count - parColonne
+                Button(deplie ? L("Replier") : L("+ \(reste) autres")) {
                     if deplie { deplies.remove(e.0) } else { deplies.insert(e.0) }
                 }
                 .buttonStyle(.link).font(.secondaire)
@@ -213,7 +225,7 @@ struct CarteProspect: View {
                 HStack(spacing: 4) {
                     if retard || aujourdhui {
                         Image(systemName: "clock").font(.system(size: 10))
-                        Text(retard ? Dates.court(contact.prochaineDate) : "Aujourd'hui")
+                        Text(retard ? Dates.court(contact.prochaineDate) : L("Aujourd'hui"))
                     } else if !contact.prochaineDate.isEmpty {
                         Text(Dates.court(contact.prochaineDate))
                     }
@@ -233,6 +245,6 @@ struct CarteProspect: View {
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
             .strokeBorder(choisie ? Color.action : Color.separateur.opacity(0.6), lineWidth: choisie ? 1.5 : 0.5))
         .contentShape(Rectangle())
-        .help(echange?.resume ?? "Aucun échange noté")
+        .help(echange?.resumeAffiche ?? L("Aucun échange noté"))
     }
 }

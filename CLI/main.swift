@@ -47,6 +47,9 @@ pilote : contacts et fil de Pilote (même base que l'app)
   pilote gmail-acces [--verifier]     sur le Mac, une fois : autorise l'outil à lire le mot de passe Gmail rangé par l'app
                                       (fenêtre du trousseau : « Toujours autoriser ») ; --verifier : connexion à Gmail, aucun mail
   pilote echec <id_evenement>
+  pilote aucune-reponse-due <id_contact> <pourquoi> [--par <qui>]   la dernière réponse reçue n'appelle aucune réponse
+                                      (« Merci », attente du support) : la fiche sort de « Réponse reçue, à traiter » jusqu'au
+                                      prochain message reçu ; le fil note la raison
   pilote import <fichier.json> [--mettre-a-jour]
                                       [{"contact": {…}, "evenements": [{…}]}], relançable sans doublon ;
                                       un contact déjà présent n'est pas modifié, sauf avec --mettre-a-jour
@@ -215,6 +218,11 @@ do {
         guard args.count > 1 else { echouer("Usage : pilote \(commande) <id_evenement> [--malgre-condition]") }
         try stock.marquer(evenementId: args[1], statut: commande, malgreCondition: args.contains("--malgre-condition"))
         print("{\"ok\": true}")
+
+    case "aucune-reponse-due":
+        guard args.count > 2 else { echouer("Usage : pilote aucune-reponse-due <id_contact> <pourquoi> [--par <qui>]") }
+        let par = args.firstIndex(of: "--par").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "Claude"
+        sortir(try stock.marquerAucuneReponseDue(contactId: args[1], pourquoi: args[2], par: par))
 
     case "a-envoyer":
         var lignes = try EnvoiPilote.aEnvoyer(stock, outils: try OutilsEnvoi.selonEnvironnement())

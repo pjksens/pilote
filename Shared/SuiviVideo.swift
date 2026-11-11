@@ -28,6 +28,12 @@ enum PalierReleve: String, Hashable, Codable {
     }
     /// « 48h » / « 7j » : le code écrit dans les verdicts et dans les sorties de `pilote video-stats` / `video-dus`.
     var code: String { self == .h48 ? "48h" : (self == .j7 ? "7j" : "autre") }
+    /// Le palier tel que l'écran le dit (le code, lui, ne change jamais : il se stocke et se compare).
+    var affichage: String { self == .h48 ? L("48h") : (self == .j7 ? L("7j") : L("précoce")) }
+    /// Idem à partir du code stocké dans un verdict (« 48h », « 7j », « autre »).
+    static func affichage(code: String) -> String {
+        PalierReleve(code: code)?.affichage ?? (code == PalierReleve.autre.code ? PalierReleve.autre.affichage : code)
+    }
     init?(code: String) {
         switch code.lowercased().replacingOccurrences(of: " ", with: "") {
         case "48h": self = .h48
@@ -61,7 +67,7 @@ struct ReleveVideo: Hashable, Codable {
     /// « 48 h », « 7 j », « 3 h », « 19 j » : le délai après la publication, dit simplement.
     var delaiTexte: String {
         guard let h = delaiHeures else { return "?" }
-        return h < 48 ? "\(Int(h.rounded())) h" : "\(Int((h / 24).rounded())) j"
+        return h < 48 ? L("\(Int(h.rounded())) h") : L("\(Int((h / 24).rounded())) j")
     }
 }
 
@@ -74,7 +80,9 @@ struct ConversionLigne: Hashable, Codable {
 }
 
 enum VerdictVocabulaire {
-    static let verdicts: [(String, String)] = [("marche", "A marché"), ("moyen", "Moyen"), ("rate", "N'a pas marché"), ("trop_tot", "Trop tôt pour dire")]
+    static var verdicts: [(String, String)] {
+        [("marche", L("A marché")), ("moyen", L("Moyen")), ("rate", L("N'a pas marché")), ("trop_tot", L("Trop tôt pour dire"))]
+    }
     static func libelle(_ v: String) -> String { Libelles.libelle(verdicts, v) }
 }
 
@@ -212,7 +220,7 @@ enum SuiviVideo {
 
     static func charger(stock: Stockage, chemin: URL = cheminStats) -> SuiviCharge {
         guard FileManager.default.fileExists(atPath: chemin.path) else {
-            return SuiviCharge(posts: [], erreur: "stats.sqlite introuvable : \(chemin.path)")
+            return SuiviCharge(posts: [], erreur: L("stats.sqlite introuvable : \(chemin.path)"))
         }
         do {
             let lecteur = try LecteurStats(chemin: chemin)
@@ -257,7 +265,7 @@ enum SuiviVideo {
             posts.sort { $0.publieLe == $1.publieLe ? $0.id < $1.id : $0.publieLe > $1.publieLe }
             return SuiviCharge(posts: posts, erreur: nil)
         } catch {
-            return SuiviCharge(posts: [], erreur: "Lecture de stats.sqlite impossible : \(error)")
+            return SuiviCharge(posts: [], erreur: L("Lecture de stats.sqlite impossible : \(error)"))
         }
     }
 
@@ -379,7 +387,7 @@ final class LecteurStats {
     init(chemin: URL) throws {
         var p: OpaquePointer?
         guard sqlite3_open_v2(chemin.path, &p, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let p else {
-            throw ErreurSuivi(description: "Impossible d'ouvrir \(chemin.path)")
+            throw ErreurSuivi(description: L("Impossible d'ouvrir \(chemin.path)"))   // montré à l'écran (Stats vidéos) via « Lecture de stats.sqlite impossible »
         }
         db = p
         sqlite3_busy_timeout(p, 3000)

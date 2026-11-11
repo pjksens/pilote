@@ -17,7 +17,7 @@ if [ "${1:-}" = "--captures" ]; then
   mkdir -p docs/captures
   # Stats vidéos lit une base de relevés qui n'existe pas en démo : pas de capture.
   lancer --env PILOTE_CAPTURES="$PWD/docs/captures" \
-         --env PILOTE_CAPTURES_PAGES=aujourdhui,journee,prospects,contacts,semaine,publications,planning,taches,projets,claude \
+         --env PILOTE_CAPTURES_PAGES=aujourdhui,journee,prospects,contacts,semaine,planning,taches,projets,claude \
          "$APP" --args -apparence clair
   lancer --env PILOTE_CAPTURES="$PWD/docs/captures" --env PILOTE_CAPTURES_PAGES=aujourdhui,claude \
          --env PILOTE_CAPTURES_SUFFIXE=-sombre "$APP" --args -apparence sombre
@@ -28,7 +28,8 @@ elif [ "${1:-}" = "--gif" ]; then
   shift; NOMS="suivi facteur claude"; [ $# -gt 0 ] && NOMS="$*"
   for s in $NOMS; do
     DEMO="$(mktemp -d -t pilote-demo)"   # chaque scénario repart des données de démo neuves
-    lancer --env PILOTE_CAPTURES="$IMAGES" --env PILOTE_SCENARIO="$s" "$APP" --args -apparence clair
+    DEPLIER=""; [ "$s" = "claude" ] && DEPLIER="app"
+    lancer --env PILOTE_CAPTURES="$IMAGES" --env PILOTE_SCENARIO="$s" --env PILOTE_DEPLIER="$DEPLIER" "$APP" --args -apparence clair
     (cd "$IMAGES/$s" && ffmpeg -loglevel error -y -f concat -safe 0 -i images.txt \
       -vf "fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
       -loop 0 "$SORTIE/$s.gif")

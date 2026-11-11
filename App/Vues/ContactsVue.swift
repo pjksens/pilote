@@ -50,7 +50,7 @@ struct ContactsVue: View {
                     }
                     .width(min: 70, ideal: 90)
                     TableColumn("Étape", value: \.etape) { c in
-                        Pastille(texte: c.nePlusContacter ? "Ne plus contacter" : Libelles.etape(c.etape),
+                        Pastille(texte: c.nePlusContacter ? L("Ne plus contacter") : Libelles.etape(c.etape),
                                  couleur: c.nePlusContacter ? .rouge : Couleurs.etape(c.etape))
                     }
                     .width(min: 96, ideal: 104)
@@ -89,7 +89,7 @@ struct ContactsVue: View {
         .searchable(text: $recherche, placement: .toolbar, prompt: "Nom, entreprise, ville, notes")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                BoutonPrincipal(titre: "Nouveau contact", symbole: "plus") {
+                BoutonPrincipal(titre: L("Nouveau contact"), symbole: "plus") {
                     etat.nouveauContact(espace: espace == "tous" ? "kryva" : espace)
                 }
             }
@@ -123,7 +123,7 @@ struct ContactsVue: View {
             }
             .frame(width: 160)
             Spacer()
-            Text("\(total) contact\(total > 1 ? "s" : "")").font(.secondaire).foregroundStyle(Color.texte2)
+            Text("\(total) contacts").font(.secondaire).foregroundStyle(Color.texte2)
         }
         .labelsHidden()
         .padding(.horizontal, 20).padding(.vertical, 12)

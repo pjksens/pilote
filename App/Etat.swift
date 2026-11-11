@@ -9,33 +9,33 @@ enum Ecran: String, CaseIterable, Identifiable {
     static let pages: [Ecran] = [.journee, .prospects, .contacts, .semaine, .publications, .planning, .taches, .projets, .stats, .claude]
     var titre: String {
         switch self {
-        case .aujourdhui: return "Accueil"
-        case .journee: return "Journée en détail"
-        case .semaine: return "Vidéos"
-        case .prospects: return "Prospects"
-        case .planning: return "Planning"
-        case .taches: return "Tâches"
-        case .contacts: return "Tous les contacts"
-        case .projets: return "Projets"
-        case .stats: return "Stats vidéos"
-        case .publications: return "Publications"
-        case .claude: return "Agents"
+        case .aujourdhui: return L("Accueil")
+        case .journee: return L("Journée en détail")
+        case .semaine: return L("Vidéos")
+        case .prospects: return L("Prospects")
+        case .planning: return L("Planning")
+        case .taches: return L("Tâches")
+        case .contacts: return L("Tous les contacts")
+        case .projets: return L("Projets")
+        case .stats: return L("Stats vidéos")
+        case .publications: return L("Publications")
+        case .claude: return L("Agents")
         }
     }
     /// Ce qu'on trouve sur la page (pour ⌘K).
     var resume: String {
         switch self {
-        case .aujourdhui: return "les gestes du moment et les 5 domaines"
-        case .journee: return "l'ancien écran du jour : file d'envoi, agents, demain, inscrits, chiffres"
-        case .semaine: return "vidéos de la semaine, prompteurs, sujets"
-        case .prospects: return "les personnes suivies, par étape"
-        case .planning: return "rendez-vous et agenda"
-        case .taches: return "les Rappels, par jour"
-        case .contacts: return "tout le carnet"
-        case .projets: return "la carte des projets et leur état"
-        case .stats: return "vues et verdicts des vidéos postées"
-        case .publications: return "publications programmées et à valider"
-        case .claude: return "les sessions et ce qu'elles font"
+        case .aujourdhui: return L("les gestes du moment et les 5 domaines")
+        case .journee: return L("l'ancien écran du jour : file d'envoi, agents, demain, inscrits, chiffres")
+        case .semaine: return L("vidéos de la semaine, prompteurs, sujets")
+        case .prospects: return L("les personnes suivies, par étape")
+        case .planning: return L("rendez-vous et agenda")
+        case .taches: return L("les Rappels, par jour")
+        case .contacts: return L("tout le carnet")
+        case .projets: return L("la carte des projets et leur état")
+        case .stats: return L("vues et verdicts des vidéos postées")
+        case .publications: return L("publications programmées et à valider")
+        case .claude: return L("les sessions et ce qu'elles font")
         }
     }
     var symbole: String {
@@ -205,7 +205,8 @@ final class Etat {
                 try DemoDonnees.remplirSiVide(g)
                 return (g, Stockage(base: try Base()), nil)
             } catch {
-                return (nil, nil, "La base de Pilote ne s'ouvre pas : \(error)")
+                let detail = "\(error)"
+                return (nil, nil, L("La base de Pilote ne s'ouvre pas : \(detail)"))
             }
         }.value
         stock = gestes
@@ -213,6 +214,8 @@ final class Etat {
         erreurBase = erreur
         guard gestes != nil else { premiereLecture = true; return }
         charger()
+        // Liaison facultative avec Pip (réunions de l'agenda) : ne fait rien si Pip n'est pas installé.
+        PipLiaison.partage.demarrer(stock: { [weak self] in self?.stock }, apres: { [weak self] in self?.charger() })
         Task { await surveiller() }
         // Sur une copie de la base (PILOTE_BASE, essais) : ni synchro avec l'admin KRYVA, ni sauvegarde iCloud.
         if !FileEnvoi.surCopie() {
@@ -254,7 +257,7 @@ final class Etat {
     private func appliquer(_ l: LectureEtat) {
         lectureEnCours = false
         if let e = l.erreur {
-            erreurBase = "Lecture impossible : \(e)"
+            erreurBase = L("Lecture impossible : \(e)")
         } else {
             if erreurBase != nil { erreurBase = nil }
             maj(\.contacts, l.contacts)
@@ -409,7 +412,8 @@ final class Etat {
             erreurStatutsComptes = nil
             dernierComptes = Date()
         } catch {
-            erreurStatutsComptes = "Statuts des comptes non lus : \(error.localizedDescription)"
+            let detail = error.localizedDescription
+            erreurStatutsComptes = L("Statuts des comptes non lus : \(detail)")
         }
     }
 
@@ -428,7 +432,7 @@ final class Etat {
 
     func enregistrer(projet champs: [String: Any]) {
         guard let stock else { return }
-        do { try stock.enregistrerProjet(champs); charger() } catch { erreurBase = "Enregistrement impossible : \(error)" }
+        do { try stock.enregistrerProjet(champs); charger() } catch { erreurBase = erreurEnregistrement(error) }
     }
 
     func ouvrir(projet id: String) {
@@ -439,7 +443,7 @@ final class Etat {
     /// « Envoyer ces N mails » : le fil des « Re: » sans reponse_a est cherché dans Mail ici (l'app a le droit de le piloter,
     /// pas l'agent launchd), puis les mails entrent dans la file et l'agent est réveillé pour le premier. Renvoie l'erreur à montrer.
     func mettreEnFile(_ ids: [String]) async -> String? {
-        guard let stock else { return "La base de Pilote n'est pas ouverte." }
+        guard let stock else { return L("La base de Pilote n'est pas ouverte.") }
         var fils: [String: String] = [:]
         for id in ids {
             guard let e = try? stock.evenement(id), FileEnvoi.filACherche(e), let c = try? stock.contact(e.contactId) else { continue }
@@ -450,7 +454,8 @@ final class Etat {
         do {
             try FileEnvoi.mettreEnFile(stock, ids: ids, fils: fils, outils: .mac)
         } catch {
-            return "Mise en file impossible, rien ne part : \(error)"
+            let detail = "\(error)"
+            return L("Mise en file impossible, rien ne part : \(detail)")
         }
         charger()
         return FileEnvoi.reveillerAgent()
@@ -458,7 +463,7 @@ final class Etat {
 
     /// « Arrêter la file » : ce qui attend est annulé et reste à envoyer.
     func arreterFile() -> String? {
-        guard let stock else { return "La base de Pilote n'est pas ouverte." }
+        guard let stock else { return L("La base de Pilote n'est pas ouverte.") }
         do { try FileEnvoi.arreter(stock, raison: "file arrêtée par \(Moi.nom) (bouton « Arrêter la file »)") } catch { return "\(error)" }
         charger()
         return nil
@@ -486,7 +491,7 @@ final class Etat {
     func enregistrer(_ c: Contact) {
         guard let stock else { return }
         if avantModification[c.id] == nil, let avant = contact(c.id) { avantModification[c.id] = avant }
-        do { try stock.enregistrer(c); charger() } catch { erreurBase = "Enregistrement impossible : \(error)" }
+        do { try stock.enregistrer(c); charger() } catch { erreurBase = erreurEnregistrement(error) }
         minuteriesModification[c.id]?.cancel()
         minuteriesModification[c.id] = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
@@ -554,8 +559,8 @@ final class Etat {
         guard let statut = VideoCalcul.statutApres(action: action, fait: fait) else { return }
         changerVideo(jour: jour, compte: compte, statut: statut)
         let sujet = video(jour: jour, compte: compte)?.sujet ?? ""
-        try? Decisions.noter(question: "Vidéo \(VideoVocabulaire.compte(compte)) du \(jour)\(sujet.isEmpty ? "" : " : \(sujet)")",
-                             choix: "\(fait ? "Fait" : "Remis à faire") dans Ma journée (\(action)) : statut « \(VideoVocabulaire.statut(statut)) ».",
+        try? Decisions.noter(question: "Vidéo \(VideoVocabulaire.compteFrancais(compte)) du \(jour)\(sujet.isEmpty ? "" : " : \(sujet)")",
+                             choix: "\(fait ? "Fait" : "Remis à faire") dans Ma journée (\(action)) : statut « \(VideoVocabulaire.statutFrancais(statut)) ».",
                              ref: "video:\(jour):\(compte):\(action):\(Int(Date().timeIntervalSince1970))", liste: "Contenu")
     }
 
@@ -565,7 +570,12 @@ final class Etat {
 
     func enregistrer(video champs: [String: Any]) {
         guard let stock else { return }
-        do { try stock.enregistrerVideo(champs); charger() } catch { erreurBase = "Enregistrement impossible : \(error)" }
+        do { try stock.enregistrerVideo(champs); charger() } catch { erreurBase = erreurEnregistrement(error) }
+    }
+
+    private func erreurEnregistrement(_ error: Error) -> String {
+        let detail = "\(error)"
+        return L("Enregistrement impossible : \(detail)")
     }
 
     /// Ouvre un prompteur ou une fiche : une adresse web, sinon un chemin (« ~ » compris).
@@ -751,7 +761,7 @@ final class Etat {
         ])
         charger()
         if let c = contact(contactId) {
-            informerAgent(c, "\(Moi.nom) a noté au fil (\(Libelles.typeEvenement(type)) \(Libelles.canal(canal))) : \(texte.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300))")
+            informerAgent(c, "\(Moi.nom) a noté au fil (\(Libelles.typeEvenementFr(type)) \(Libelles.canalFr(canal))) : \(texte.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300))")
         }
     }
 
@@ -816,10 +826,10 @@ final class Etat {
 
     private func informerApresMarque(_ m: MessageAEnvoyer?, statut: String) {
         guard let m, statut == "envoye" || statut == "annule" else { return }
-        if statut == "annule" { informerAgent(m.contact, "Message \(Libelles.canal(m.evenement.canal)) annulé, pas envoyé"); return }
+        if statut == "annule" { informerAgent(m.contact, "Message \(Libelles.canalFr(m.evenement.canal)) annulé, pas envoyé"); return }
         let c = contact(m.contact.id) ?? m.contact
-        let suite = c.prochaineAction.isEmpty ? "aucune suite posée" : "suite : « \(c.prochaineAction.prefix(80)) » le \(Dates.court(c.prochaineDate))"
-        informerAgent(c, "Message \(Libelles.canal(m.evenement.canal)) envoyé par \(Moi.nom), étape « \(Libelles.etape(c.etape)) », \(suite)")
+        let suite = c.prochaineAction.isEmpty ? "aucune suite posée" : "suite : « \(c.prochaineAction.prefix(80)) » le \(Dates.court(c.prochaineDate, francais: true))"
+        informerAgent(c, "Message \(Libelles.canalFr(m.evenement.canal)) envoyé par \(Moi.nom), étape « \(Libelles.etapeFr(c.etape)) », \(suite)")
     }
 
     func supprimerEvenement(_ id: String) {

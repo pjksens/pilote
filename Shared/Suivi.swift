@@ -182,7 +182,7 @@ extension Stockage {
                               [s.nouvelleAction, s.nouvelleDate, Dates.maintenant(), s.contactId])
             let avant = s.ancienneAction.isEmpty ? "aucune action" : "« \(s.ancienneAction.prefix(70)) »"
             try ajouterEvenement(contactId: s.contactId, ["canal": "autre", "sens": "interne", "type": "note", "statut": "fait", "par": "Pilote",
-                "texte": "Suite posée par Pilote (un envoi du jour n'avait pas fait avancer la fiche) : « \(s.nouvelleAction.prefix(70)) » le \(Dates.court(s.nouvelleDate)). Avant : \(avant) du \(Dates.court(s.ancienneDate))."])
+                "texte": "Suite posée par Pilote (un envoi du jour n'avait pas fait avancer la fiche) : « \(s.nouvelleAction.prefix(70)) » le \(Dates.court(s.nouvelleDate, francais: true)). Avant : \(avant) du \(Dates.court(s.ancienneDate, francais: true))."])
         }
     }
 
@@ -213,7 +213,7 @@ extension Stockage {
             }
             // R3 : un prospect actif a toujours une date, même pour une dernière étape (« classer sans suite »).
             if c.prochaineDate.isEmpty {
-                let l = ligne(c.prochaineAction.isEmpty ? "aucune action ni date (étape « \(Libelles.etape(c.etape)) »)"
+                let l = ligne(c.prochaineAction.isEmpty ? "aucune action ni date (étape « \(Libelles.etapeFr(c.etape)) »)"
                                                         : "action « \(c.prochaineAction.prefix(60)) » sans date")
                 if c.etape == "a_contacter" { r.sansDateAContacter.append(l) } else { r.sansDate.append(l) }
                 continue
@@ -252,6 +252,15 @@ enum RaisonPasEnvoye: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Le libellé affiché à l'écran (10/11, langues). Le `rawValue` reste le français : c'est lui qui est écrit au fil.
+    var libelle: String {
+        switch self {
+        case .pasLeMoment: return L("Pas le moment")
+        case .texteAChanger: return L("Texte à changer")
+        case .plusDActualite: return L("Plus d'actualité")
+        }
+    }
+
     static let pourMessage: [RaisonPasEnvoye] = [.pasLeMoment, .texteAChanger, .plusDActualite]
     static let pourSuivi: [RaisonPasEnvoye] = [.pasLeMoment, .plusDActualite]
 }
@@ -272,13 +281,13 @@ extension Stockage {
         guard let ligne = try base.lignes("SELECT * FROM evenements WHERE id = ? AND supprime_le = ''", [evenementId]).first else { return "" }
         let e = Self.evenement(ligne)
         let p = Self.precisionNettoyee(precision)
-        var note = "Pas envoyé (\(Libelles.canal(e.canal))) : \(raison.rawValue.lowercased())"
+        var note = "Pas envoyé (\(Libelles.canalFr(e.canal))) : \(raison.rawValue.lowercased())"
         switch raison {
         case .pasLeMoment:
             let j = jour ?? Dates.ouvres(1)
             try marquer(evenementId: evenementId, statut: "prepare")
             try reporterAction(e.contactId, au: j)
-            note += ", revu le \(Dates.court(j))"
+            note += ", revu le \(Dates.court(j, francais: true))"
         case .texteAChanger:
             try marquer(evenementId: evenementId, statut: "a_refaire")
         case .plusDActualite:
@@ -303,7 +312,7 @@ extension Stockage {
             try enregistrer(["id": contactId, "prochaine_action": "", "prochaine_date": ""])
         default:
             let j = jour ?? Dates.ouvres(1)
-            note = "Pas fait (pas le moment), revu le \(Dates.court(j)) : \(action)"
+            note = "Pas fait (pas le moment), revu le \(Dates.court(j, francais: true)) : \(action)"
             try reporterAction(contactId, au: j)
         }
         if !p.isEmpty { note += " — " + p }
@@ -319,13 +328,13 @@ enum Changements {
     /// Ce qui a changé sur la fiche entre deux états : étape, prochaine action, date, « ne plus contacter ». Vide = rien de suivi.
     static func resume(avant: Contact, apres: Contact) -> String {
         var l: [String] = []
-        if avant.etape != apres.etape { l.append("étape : \(Libelles.etape(avant.etape)) → \(Libelles.etape(apres.etape))") }
+        if avant.etape != apres.etape { l.append("étape : \(Libelles.etapeFr(avant.etape)) → \(Libelles.etapeFr(apres.etape))") }
         if avant.prochaineAction != apres.prochaineAction {
             func q(_ s: String) -> String { s.isEmpty ? "aucune" : "« \(s.prefix(80)) »" }
             l.append("prochaine action : \(q(avant.prochaineAction)) → \(q(apres.prochaineAction))")
         }
         if avant.prochaineDate != apres.prochaineDate {
-            func d(_ s: String) -> String { s.isEmpty ? "aucune" : Dates.court(s) }
+            func d(_ s: String) -> String { s.isEmpty ? "aucune" : Dates.court(s, francais: true) }
             l.append("date : \(d(avant.prochaineDate)) → \(d(apres.prochaineDate))")
         }
         if avant.nePlusContacter != apres.nePlusContacter { l.append(apres.nePlusContacter ? "ne plus contacter" : "recontact autorisé") }
@@ -346,8 +355,8 @@ extension Stockage {
     @discardableResult
     func reporterEtNoter(_ contactId: String, au jour: String) throws -> String {
         guard let c = try contact(contactId) else { return "" }
-        let avant = c.prochaineDate.isEmpty ? "sans date" : Dates.court(c.prochaineDate)
-        let note = "Reporté : \(c.prochaineAction.isEmpty ? "action prévue" : "« \(c.prochaineAction.prefix(70)) »") du \(avant) au \(Dates.court(jour))"
+        let avant = c.prochaineDate.isEmpty ? "sans date" : Dates.court(c.prochaineDate, francais: true)
+        let note = "Reporté : \(c.prochaineAction.isEmpty ? "action prévue" : "« \(c.prochaineAction.prefix(70)) »") du \(avant) au \(Dates.court(jour, francais: true))"
         try reporterAction(contactId, au: jour)
         try noterAuFil(contactId, note)
         return note
@@ -371,7 +380,7 @@ extension Stockage {
         var note = "Fait : \(action)"
         if Libelles.estSansSuite(action), c.etape != "gagne", c.etape != "perdu" {
             try enregistrer(["id": c.id, "etape": "perdu", "prochaine_action": "", "prochaine_date": ""])
-            note += " · classée sans suite : étape « \(Libelles.etape(c.etape)) » → « Perdu », plus aucune relance"
+            note += " · classée sans suite : étape « \(Libelles.etapeFr(c.etape)) » → « Perdu », plus aucune relance"
             try noterAuFil(c.id, note)
             return note
         }
@@ -384,7 +393,7 @@ extension Stockage {
             let (suite, date) = Self.suiteApresEnvoi(e, actionFaite: action, etape: c.etape)
             let etape = Libelles.rang("contacte") > Libelles.rang(c.etape) ? "contacte" : c.etape
             try enregistrer(["id": c.id, "etape": etape, "prochaine_action": suite, "prochaine_date": date])
-            note += " · suite posée : « \(suite.prefix(70)) » le \(Dates.court(date))"
+            note += " · suite posée : « \(suite.prefix(70)) » le \(Dates.court(date, francais: true))"
         } else {
             try enregistrer(["id": c.id, "prochaine_action": "", "prochaine_date": ""])
         }

@@ -2,6 +2,8 @@ import XCTest
 
 /// 04/11, GO de PILOTE : filtre des expéditeurs automatiques (point b) et alerte « capteur ou veille arrêtés ».
 final class AlerteArretTests: XCTestCase {
+    override func setUp() { Loc.langue = "fr" }   // ces tests attendent le français (sous xctest, la langue du bundle de test est « en »)
+
     private var paris: Calendar = {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "Europe/Paris")!

@@ -31,7 +31,7 @@ final class Base: @unchecked Sendable {
         var p: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(chemin.path, &p, flags, nil) == SQLITE_OK, let p else {
-            throw ErreurBase(description: "Impossible d'ouvrir la base \(chemin.path)")
+            throw ErreurBase(description: L("Impossible d'ouvrir la base \(chemin.path)"))
         }
         db = p
         self.chemin = chemin
@@ -118,6 +118,12 @@ final class Base: @unchecked Sendable {
         let colonnesContacts = Set(try lignes("PRAGMA table_info(contacts)").compactMap { $0["name"] as? String })
         if !colonnesContacts.contains("supprime_le") {
             try ajouterColonne("ALTER TABLE contacts ADD COLUMN supprime_le TEXT NOT NULL DEFAULT ''")
+        }
+        // 10/11 (Organisation, demande de PILOTE) : « aucune réponse due » à une réponse reçue (« Merci », attente du support).
+        // On garde le nombre de réponses reçues couvertes : un message reçu de plus (quelle que soit sa date) rend l'alerte.
+        // -1 = pas de marque. Hors synchro KRYVA (Synchro.colonnesContact).
+        if !colonnesContacts.contains("aucune_reponse_due_recus") {
+            try ajouterColonne("ALTER TABLE contacts ADD COLUMN aucune_reponse_due_recus INTEGER NOT NULL DEFAULT -1")
         }
         try executer("CREATE TABLE IF NOT EXISTS synchro (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)")
         try executer("CREATE INDEX IF NOT EXISTS contacts_prochaine ON contacts(prochaine_date)")

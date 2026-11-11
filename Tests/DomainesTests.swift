@@ -484,6 +484,7 @@ final class DomainesTests: XCTestCase {
     private var stock: Stockage!
 
     override func setUpWithError() throws {
+        Loc.langue = "fr"   // ces tests attendent le français (sous xctest, la langue du bundle de test est « en »)
         chemin = FileManager.default.temporaryDirectory.appendingPathComponent("pilote-cartes-\(UUID().uuidString).sqlite")
         stock = Stockage(base: try Base(chemin: chemin))
     }
@@ -585,6 +586,49 @@ final class DomainesTests: XCTestCase {
         XCTAssertEqual(r["Reparti"], 0)
         XCTAssertEqual(r["Repond"], 0)
         XCTAssertEqual(r["Avant"], 1, "un envoi d'avant l'échec ne le règle pas")
+    }
+
+    /// 10/11 (Organisation, demande de PILOTE) : « aucune réponse due » sort une réponse reçue de la liste ambre jusqu'au
+    /// prochain message reçu, même si ce message porte une date plus ancienne (noté en retard).
+    func testAucuneReponseDueSortDeLaListeAmbre() throws {
+        let maintenant = ISO8601DateFormatter().date(from: "2026-11-10T09:00:00Z")!
+        let c = try stock.enregistrer(["nom": "Lafitte", "espace": "kryva", "etape": "contacte", "source": "test"]).id
+        func evenement(_ le: String, _ sens: String, _ texte: String) throws {
+            _ = try stock.ajouterEvenement(contactId: c, ["le": le, "canal": "mail", "sens": sens, "type": "message",
+                                                          "texte": texte, "statut": sens == "entrant" ? "fait" : "envoye", "par": "Claude"])
+        }
+        func resume() throws -> ResumeContact { try XCTUnwrap(try stock.resumesContacts(maintenant: maintenant).first { $0.id == c }) }
+        func ventes() throws -> EtatDomaine {
+            let s = SourcesDomaines(maintenant: maintenant, contacts: try stock.resumesContacts(maintenant: maintenant))
+            return Domaines.regrouper(s).first { $0.domaine == .ventes }!
+        }
+        func ton() throws -> TonStatut? { try ventes().elements(.fait).first { $0.contactId == c }?.ton }
+        func aTraiter() throws -> Bool {
+            try Domaines.sections(.ventes, try ventes(), maintenant: maintenant).contains { $0.titre == Domaines.reponsesPar(.ventes) }
+        }
+
+        try evenement("2026-11-06T10:00:00Z", "sortant", "Bonjour, voici le devis.")
+        XCTAssertThrowsError(try stock.marquerAucuneReponseDue(contactId: c, pourquoi: "Merci", par: "Ventes"),
+                             "le dernier échange est un envoi : rien à marquer")
+        try evenement("2026-11-09T08:00:00Z", "entrant", "Merci, bonne journée")
+        XCTAssertFalse(try resume().aucuneReponseDue)
+        XCTAssertEqual(try ton(), .ambre)
+        XCTAssertTrue(try aTraiter())
+        XCTAssertThrowsError(try stock.marquerAucuneReponseDue(contactId: c, pourquoi: "  ", par: "Ventes"), "pourquoi obligatoire")
+
+        let note = try stock.marquerAucuneReponseDue(contactId: c, pourquoi: "Merci de fin d'échange", par: "Ventes")
+        XCTAssertEqual(note.texte, "Aucune réponse due : Merci de fin d'échange")
+        XCTAssertEqual(note.sens, "interne")
+        XCTAssertTrue(try resume().aucuneReponseDue)
+        XCTAssertEqual(try ton(), .vert)
+        XCTAssertFalse(try aTraiter())
+        XCTAssertEqual(try ventes().elements(.fait).first { $0.contactId == c }?.detail, "A répondu le 09/11 (Mail), aucune réponse due")
+
+        // Un message reçu noté après la marque, même daté d'avant, rend l'alerte.
+        try evenement("2026-11-08T18:00:00Z", "entrant", "Au fait, une question sur l'acompte")
+        XCTAssertFalse(try resume().aucuneReponseDue)
+        XCTAssertEqual(try ton(), .ambre)
+        XCTAssertTrue(try aTraiter())
     }
 
     // MARK: Qui une carte attend (09/11, Organisation)

@@ -154,7 +154,7 @@ them. For each item, only write what you actually verified.
   <br><sub>Modo demo (<code>./scripts/demo.sh</code>): datos inventados, sin personas reales.</sub>
 </p>
 
-> La interfaz de la app y los comentarios de su código están en francés. Este README existe en nueve idiomas; la app, todavía no.
+> La interfaz de la app sigue el idioma de tu Mac: inglés, francés o español (inglés para cualquier otro idioma). Los comentarios del código, la herramienta de línea de comandos `pilote` y el servidor MCP siguen en francés. Este README existe en nueve idiomas.
 
 ## Qué hace Pilote
 
@@ -174,6 +174,7 @@ them. For each item, only write what you actually verified.
 - **Correo bajo control.** Un correo preparado solo sale cuando tú haces clic, desde tu Gmail (SMTP, contraseña de
   aplicación guardada en el llavero de macOS, que Claude nunca lee). Texto plano, y las respuestas se quedan en el hilo
   correcto.
+- **Pip, opcional.** Si [Pip](https://github.com/pjksens/heypip) (una app de notch para Mac que acompaña las llamadas) está instalada, aparece un botón “Abrir Pip” en una videollamada de tu calendario: Pip se abre con el nombre de la llamada y el contacto vinculado. Opcionalmente, Pilote lo abre solo dos minutos antes. Pip solo graba tras tu propio clic y, cuando Claude ha escrito el resumen de la llamada, Pilote lo archiva en el historial del contacto. Lee tu calendario, así que sigue `rappels_calendrier`, desactivado por defecto.
 - **Publicación.** Programa vídeos en YouTube, Instagram y TikTok, con una aprobación explícita antes de que salga cada
   uno (tokens en el llavero).
 - **Radar.** Vigila cuentas de redes sociales (visualizaciones, ritmo de publicación, ideas), introducidas a mano o
@@ -189,8 +190,7 @@ Tus sesiones hacen el trabajo; Pilote es donde lo ves y donde les respondes.
 </p>
 
 Cuando una sesión necesita una decisión, su pregunta aparece en la pantalla de inicio con sus botones. Tu respuesta
-espera en **“Vos réponses, prêtes à partir”** (tus respuestas, listas para salir) hasta que haces clic en **Envoyer**
-(enviar): nada llega a una sesión por accidente.
+espera en **“Tus respuestas, listas para salir”** hasta que haces clic en **Enviar**: nada llega a una sesión por accidente.
 
 <p align="center">
   <img src="docs/media/facteur.gif" width="720" alt="La pregunta de una sesión en la pantalla de inicio: un clic en una respuesta y después Enviar">
@@ -198,7 +198,7 @@ espera en **“Vos réponses, prêtes à partir”** (tus respuestas, listas par
 </p>
 
 > **Cómo llegan tus respuestas a las sesiones:** [`scripts/facteur.py`](scripts/facteur.py), el “Facteur” (el cartero).
-> El botón **Démarrer le Facteur** de la pantalla de inicio abre una sesión de Claude Code con sus instrucciones: espera
+> El botón **Iniciar Facteur** de la pantalla de inicio abre una sesión de Claude Code con sus instrucciones: espera
 > en segundo plano y entrega cada respuesta a la sesión correcta en unos segundos. Es la sesión que hizo la pregunta o a
 > la que escribiste; si no, la indicada en `facteur.sessions` de `reglages.json`; si no, la de la tabla de `EQUIPE.md`.
 > Ningún identificador de sesión está escrito en el código.
@@ -229,9 +229,9 @@ sin permiso de grabación de pantalla.
 
 | | |
 |---|---|
-| ![Agentes: las sesiones de Claude Code y su diario](docs/captures/10-claude.png) | ![Contactos: la libreta de direcciones, la etapa y la siguiente acción](docs/captures/04-contacts.png) |
+| ![Agentes: las sesiones de Claude Code y su diario](docs/captures/09-claude.png) | ![Contactos: la libreta de direcciones, la etapa y la siguiente acción](docs/captures/04-contacts.png) |
 | ![Prospectos: el tablero por etapas](docs/captures/03-prospects.png) | ![Vídeos: la semana, dos cuentas](docs/captures/05-semaine.png) |
-| ![Tareas: arrastra una tarjeta para cambiar su día](docs/captures/08-taches.png) | ![Pantalla de inicio en modo oscuro](docs/captures/01-aujourdhui-sombre.png) |
+| ![Tareas: arrastra una tarjeta para cambiar su día](docs/captures/07-taches.png) | ![Pantalla de inicio en modo oscuro](docs/captures/01-aujourdhui-sombre.png) |
 
 Todos los datos de las capturas son inventados (nombres, empresas, números de teléfono en el rango de ficción francés
 06 39 98 00 0x, direcciones en `.example`).
@@ -319,8 +319,7 @@ datos, en lectura y escritura, saltándose la seguridad a nivel de fila. Tampoco
 `anon`: la clave “anon” es pública en tus apps.
 
 **Stripe** (`stripe_cle`, opcional): una **clave restringida** (`rk_…`) con el único permiso “Subscriptions: Read”.
-Distingue las pruebas de las cuentas de pago; sin ella, una cuenta con suscripción aparece como “À vérifier” (por
-verificar).
+Distingue las pruebas de las cuentas de pago; sin ella, una cuenta con suscripción aparece como “Por revisar”.
 
 **Contador** (`compteur`, opcional): un comando tuyo, ejecutado en `dossier`, que imprime una línea `ACTIFS 7 / 10`,
 luego títulos de sección seguidos de líneas sangradas con dos espacios.

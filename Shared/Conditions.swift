@@ -28,7 +28,7 @@ extension Stockage {
     /// Renvoie la ligne écrite ; vide s'il n'y a pas de condition ou si elle était déjà cochée.
     @discardableResult
     func conditionRemplie(evenementId: String, par: String = "\(Moi.nom)") throws -> String {
-        guard let e = try evenement(evenementId) else { throw ErreurBase(description: "Événement introuvable : \(evenementId)") }
+        guard let e = try evenement(evenementId) else { throw ErreurBase(description: L("Événement introuvable : \(evenementId)")) }
         guard e.conditionEnAttente else { return "" }
         let maintenant = Dates.maintenant()
         try base.executer("UPDATE evenements SET condition_ok_le = ?, maj_le = ? WHERE id = ?", [maintenant, maintenant, evenementId])

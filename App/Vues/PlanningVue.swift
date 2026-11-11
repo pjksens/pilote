@@ -15,6 +15,8 @@ struct PlanningVue: View {
     enum Mode: String, CaseIterable, Identifiable {
         case jour = "Jour", semaine = "Semaine"
         var id: String { rawValue }
+        /// Le mot à l'écran (la valeur brute reste le français).
+        var libelle: String { self == .jour ? L("Jour") : L("Semaine") }
     }
 
     private var cal: Calendar { Semaine.calendrier() }
@@ -35,7 +37,7 @@ struct PlanningVue: View {
             let plage = DateInterval(start: jours[0], end: cal.date(byAdding: .day, value: 1, to: jours[jours.count - 1])!)
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom, spacing: 16) {
-                    EnTete(titre: "Planning", detail: libelle(jours, maintenant))
+                    EnTete(titre: L("Planning"), detail: libelle(jours, maintenant))
                     legende
                 }
                 commandes(maintenant)
@@ -51,7 +53,7 @@ struct PlanningVue: View {
     private func commandes(_ maintenant: Date) -> some View {
         HStack(spacing: 10) {
             Picker("Vue", selection: $mode) {
-                ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(Mode.allCases) { Text($0.libelle).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(width: 200)
             Button { avancer(-1, maintenant) } label: { Image(systemName: "chevron.left") }
@@ -64,13 +66,13 @@ struct PlanningVue: View {
             let ouvertes = decisions.filter { !faite($0) }.count
             if ouvertes > 0 {
                 Button { etat.ecran = .aujourdhui } label: {
-                    Label("\(ouvertes) question\(ouvertes > 1 ? "s" : "") à trancher sur l'accueil", systemImage: "questionmark.circle.fill")
+                    Label(L("\(ouvertes) questions à trancher sur l'accueil"), systemImage: "questionmark.circle.fill")
                 }
                 .buttonStyle(.bordered).tint(.ambre)
             }
             let finies = agenda.planning.filter { !Decisions.estDecision($0.titre) && faite($0) }.count
             if finies > 0 {
-                Toggle("Montrer les \(finies) terminée\(finies > 1 ? "s" : "")", isOn: $montrerTerminees).toggleStyle(.checkbox)
+                Toggle(L("Montrer les \(finies) terminées"), isOn: $montrerTerminees).toggleStyle(.checkbox)
                     .font(.secondaire)
             }
         }
@@ -106,22 +108,22 @@ struct PlanningVue: View {
     }
 
     private func libelle(_ jours: [Date], _ maintenant: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
         var texte: String
         if jours.count == 1 {
-            f.dateFormat = "EEEE d MMMM"
-            texte = f.string(from: jours[0]) + (cal.isDate(jours[0], inSameDayAs: maintenant) ? " · aujourd'hui" : "")
+            let jour = Loc.date(jours[0], "EEEEdMMMM")
+            texte = cal.isDate(jours[0], inSameDayAs: maintenant) ? L("\(jour) · aujourd'hui") : jour
         } else {
             let premier = jours[0], dernier = jours[jours.count - 1]
-            f.dateFormat = cal.isDate(premier, equalTo: dernier, toGranularity: .month) ? "d" : "d MMMM"
-            let debut = f.string(from: premier)
-            f.dateFormat = "d MMMM"
-            texte = "Du \(debut) au \(f.string(from: dernier))"
+            if cal.isDate(premier, equalTo: dernier, toGranularity: .month) {
+                // « Du 9 au 15 novembre » : les deux jours, puis le mois (l'ordre change selon la langue).
+                texte = L("Du \(Loc.date(premier, "d")) au \(Loc.date(dernier, "d")) \(Loc.date(premier, "MMMM"))")
+            } else {
+                texte = L("Du \(Loc.date(premier, "dMMMM")) au \(Loc.date(dernier, "dMMMM"))")
+            }
         }
         let taches = agenda.planning.filter { $0.genre == .tache && !Decisions.estDecision($0.titre) }
         let faites = taches.filter { $0.faite || agenda.terminees[$0.id] != nil }.count
-        if !taches.isEmpty { texte += " · tâches terminées : \(faites) sur \(taches.count)" }
+        if !taches.isEmpty { texte += " · " + L("tâches terminées : \(faites) sur \(taches.count)") }
         return texte
     }
 
@@ -131,22 +133,22 @@ struct PlanningVue: View {
     private func contenu(jours: [Date], maintenant: Date) -> some View {
         switch agenda.accesCalendrier {
         case .refuse:
-            Carte(titre: "Planning") {
-                EtatErreur(texte: "Pilote n'a pas accès au Calendrier. Réglages Système › Confidentialité › Calendriers.")
+            Carte(titre: L("Planning")) {
+                EtatErreur(texte: L("Pilote n'a pas accès au Calendrier. Réglages Système › Confidentialité › Calendriers."))
             }
         case .inconnu:
-            Carte(titre: "Planning") { EtatChargement(texte: "Lecture du Calendrier…") }
+            Carte(titre: L("Planning")) { EtatChargement(texte: L("Lecture du Calendrier…")) }
         case .coupe:
-            Carte(titre: "Planning") { EtatVide(texte: "Calendrier et Rappels coupés : à activer dans reglages.json (rappels_calendrier).") }
+            Carte(titre: L("Planning")) { EtatVide(texte: L("Calendrier et Rappels coupés : à activer dans reglages.json (rappels_calendrier).")) }
         case .accorde:
             if let e = agenda.erreurPlanning {
-                Carte(titre: "Planning") { EtatErreur(texte: e) }
+                Carte(titre: L("Planning")) { EtatErreur(texte: e) }
             }
             if !agenda.planningLu {
-                Carte(titre: "Planning") { EtatChargement(texte: "Lecture des Rappels et du Calendrier…") }
+                Carte(titre: L("Planning")) { EtatChargement(texte: L("Lecture des Rappels et du Calendrier…")) }
             } else if agenda.calendriersPlanning.isEmpty {
-                Carte(titre: "Calendriers") {
-                    EtatVide(texte: "Rien du planning sur ce Mac : ni listes de Rappels (Appels, KRYVA, Freelance, Contenu, Papiers), ni calendriers (Salle, Rendez-vous, Perso).")
+                Carte(titre: L("Calendriers")) {
+                    EtatVide(texte: L("Rien du planning sur ce Mac : ni listes de Rappels (Appels, KRYVA, Freelance, Contenu, Papiers), ni calendriers (Salle, Rendez-vous, Perso)."))
                 }
             }
             if agenda.planningLu {
@@ -213,9 +215,6 @@ struct GrillePlanning: View {
     // MARK: Repères
 
     private var enTetesJours: some View {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateFormat = "EEE"
         return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Color.clear.frame(width: marge)
@@ -223,7 +222,7 @@ struct GrillePlanning: View {
                     let auj = cal.isDate(j, inSameDayAs: maintenant)
                     Button { choisirJour(j) } label: {
                         HStack(spacing: 5) {
-                            Text(f.string(from: j)).font(.secondaire).foregroundStyle(auj ? Color.rouge : Color.texte2)
+                            Text(Loc.date(j, "EEE")).font(.secondaire).foregroundStyle(auj ? Color.rouge : Color.texte2)
                             Text("\(cal.component(.day, from: j))")
                                 .font(.ligneForte.monospacedDigit())
                                 .foregroundStyle(auj ? Color.white : Color.texte)
@@ -357,15 +356,16 @@ struct GrillePlanning: View {
     /// Tâche : son heure (ou « sans heure »). Événement : de … à … (ou « toute la journée »).
     static func horaire(_ t: TachePlanning) -> String {
         switch (t.genre, t.journee) {
-        case (.tache, true): return "sans heure"
+        case (.tache, true): return L("sans heure")
         case (.tache, false): return hhmm(t.debut)
-        case (.evenement, true): return "toute la journée"
-        case (.evenement, false): return "\(hhmm(t.debut)) à \(hhmm(t.fin))"
+        case (.evenement, true): return L("toute la journée")
+        case (.evenement, false): return Loc.plage(hhmm(t.debut), hhmm(t.fin))
         }
     }
 
     static func hhmm(_ d: Date) -> String {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "HH:mm"
         return f.string(from: d)
     }
@@ -439,8 +439,8 @@ struct BlocTache: View {
     }
 
     private var aideTermine: String {
-        tache.genre == .tache ? "Terminé : coche le rappel et prévient PILOTE"
-            : "Terminé : il ne s'affiche plus dans Pilote (Calendrier n'est pas modifié), PILOTE est prévenu"
+        tache.genre == .tache ? L("Terminé : coche le rappel et prévient PILOTE")
+            : L("Terminé : il ne s'affiche plus dans Pilote (Calendrier n'est pas modifié), PILOTE est prévenu")
     }
 
     /// La case d'une tâche : cochée et verte si finie ; en semaine, c'est le bouton « Terminé ».
@@ -466,10 +466,10 @@ struct BlocTache: View {
 
     @ViewBuilder private var notes: some View {
         if let b = tache.notes.but {
-            Text("But : " + b).font(.petit).foregroundStyle(fait ? Color.texte3 : Color.texte2).lineLimit(2)
+            Text(L("But : \(b)")).font(.petit).foregroundStyle(fait ? Color.texte3 : Color.texte2).lineLimit(2)
         }
         if let f = tache.notes.finiQuand {
-            Text("Fini quand : " + f).font(.petit).foregroundStyle(fait ? Color.texte3 : Color.texte2).lineLimit(2)
+            Text(L("Fini quand : \(f)")).font(.petit).foregroundStyle(fait ? Color.texte3 : Color.texte2).lineLimit(2)
         }
         if !tache.notes.docs.isEmpty {
             HStack(spacing: 10) {
@@ -509,7 +509,7 @@ struct DetailTachePlanning: View {
                 Text(GrillePlanning.horaire(tache)).font(.petit.monospacedDigit()).foregroundStyle(Color.texte2)
             }
             Text(tache.titre).font(.titreSection).foregroundStyle(Color.texte).fixedSize(horizontal: false, vertical: true)
-            if let b = tache.notes.but { bloc("But", b) }
+            if let b = tache.notes.but { bloc(L("But"), b) }
             if !tache.notes.docs.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Docs").font(.petit.weight(.semibold)).foregroundStyle(Color.texte2)
@@ -519,7 +519,7 @@ struct DetailTachePlanning: View {
                     }
                 }
             }
-            if let f = tache.notes.finiQuand { bloc("Fini quand", f) }
+            if let f = tache.notes.finiQuand { bloc(L("Fini quand"), f) }
             if tache.notes.but == nil && tache.notes.docs.isEmpty && tache.notes.finiQuand == nil {
                 Text("Pas de but, de document ni de « fini quand » dans l'événement.").font(.secondaire).foregroundStyle(Color.texte2)
             }
@@ -535,7 +535,7 @@ struct DetailTachePlanning: View {
                 if fait {
                     Label("Terminé", systemImage: "checkmark.circle.fill").font(.secondaire).foregroundStyle(Color.vert)
                 } else {
-                    BoutonPrincipal(titre: "Terminé", symbole: "checkmark", action: terminer)
+                    BoutonPrincipal(titre: L("Terminé"), symbole: "checkmark", action: terminer)
                 }
             }
         }

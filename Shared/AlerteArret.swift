@@ -40,16 +40,24 @@ enum AlerteArret {
     /// Les lignes d'alerte : une par composant arrêté. `nil` = fichier absent (jamais vu).
     static func lignes(capteur: Date?, veille: Date?, maintenant: Date, calendrier: Calendar = .current) -> [String] {
         func une(_ nom: String, _ derniere: Date?, _ limite: TimeInterval = seuilCourt) -> String? {
-            guard let d = derniere else { return "\(nom) : aucune trace (fichier d'état absent)" }
+            guard let d = derniere else { return L("\(nom) : aucune trace (fichier d'état absent)") }
             guard secondesActives(de: d, a: maintenant, calendrier: calendrier) > limite else { return nil }
-            let f = DateFormatter()
-            f.locale = Locale(identifier: "fr_FR")
-            f.timeZone = calendrier.timeZone
-            f.dateFormat = "dd/MM 'à' HH:mm"
-            return "\(nom) : rien écrit depuis le \(f.string(from: d)) (plus de \(limite >= 3600 ? "\(Int(limite / 3600)) h" : "\(Int(limite / 60)) min") dans la plage 7 h-23 h)"
+            return L("\(nom) : rien écrit depuis le \(jourHeure(d, calendrier)) (plus de \(texteLimite(limite)) dans la plage 7 h-23 h)")
         }
-        return [une("Capteur d'entrants (launchd, 60 s)", capteur), une("Veille de PILOTE (tâche pilote-veille, 15 min)", veille, seuil)]
+        return [une(L("Capteur d'entrants (launchd, 60 s)"), capteur), une(L("Veille de PILOTE (tâche pilote-veille, 15 min)"), veille, seuil)]
             .compactMap { $0 }
+    }
+
+    /// « 2 h », « 30 min » : une limite, dite en heures si elle en fait au moins une.
+    private static func texteLimite(_ limite: TimeInterval) -> String {
+        limite >= 3600 ? "\(Int(limite / 3600)) h" : "\(Int(limite / 60)) min"
+    }
+
+    /// « 10/11 à 14:30 » (jour numérique et heure en 24 h, dans le fuseau du calendrier).
+    private static func jourHeure(_ d: Date, _ calendrier: Calendar) -> String {
+        let jour = DateFormatter(); jour.locale = Locale(identifier: "fr_FR"); jour.timeZone = calendrier.timeZone; jour.dateFormat = "dd/MM"
+        let heure = DateFormatter(); heure.locale = Locale(identifier: "fr_FR"); heure.timeZone = calendrier.timeZone; heure.dateFormat = "HH:mm"
+        return L("\(jour.string(from: d)) à \(heure.string(from: d))")
     }
 
     /// Secondes comprises entre `de` et `a` hors samedi et dimanche (heure locale).
@@ -69,9 +77,12 @@ enum AlerteArret {
     /// « il y a 5 h 20 » / « il y a 12 min » / « il y a 2 j 3 h ».
     static func ecoule(_ s: TimeInterval) -> String {
         let m = Int(max(0, s) / 60)
-        if m < 60 { return "\(m) min" }
-        if m < 48 * 60 { return "\(m / 60) h \(String(format: "%02d", m % 60))" }
-        return "\(m / 1440) j \((m % 1440) / 60) h"
+        if m < 60 { return L("\(m) min") }
+        if m < 48 * 60 {
+            let minutes = String(format: "%02d", m % 60)
+            return L("\(m / 60) h \(minutes)")
+        }
+        return L("\(m / 1440) j \((m % 1440) / 60) h")
     }
 
     /// Les autres témoins : Facteur, service des inscrits (battement + statut de connexion), disque, WhatsApp.
@@ -79,39 +90,36 @@ enum AlerteArret {
     static func lignesAnnexes(facteur: Date?, inscrits: Date?, inscritsStatut: String?, inscritsDepuis: Date?,
                               disqueLibre: Int64?, whatsapp: Date?, maintenant: Date, calendrier: Calendar = .current) -> [String] {
         var r: [String] = []
-        func f(_ d: Date) -> String {
-            let fm = DateFormatter(); fm.locale = Locale(identifier: "fr_FR"); fm.timeZone = calendrier.timeZone; fm.dateFormat = "dd/MM 'à' HH:mm"
-            return fm.string(from: d)
-        }
-        r += lignes(nomsEtDates: [("Facteur (facteur.json, au moins toutes les 3 min)", facteur),
-                                  ("Service des inscrits (inscrits-battement.json, chaque minute)", inscrits)],
+        func f(_ d: Date) -> String { jourHeure(d, calendrier) }
+        r += lignes(nomsEtDates: [(L("Facteur (facteur.json, au moins toutes les 3 min)"), facteur),
+                                  (L("Service des inscrits (inscrits-battement.json, chaque minute)"), inscrits)],
                     maintenant: maintenant, calendrier: calendrier)
         if let st = inscritsStatut, st != "SUBSCRIBED", let dep = inscritsDepuis,
            secondesActives(de: dep, a: maintenant, calendrier: calendrier) > seuilCourt {
-            r.append("Service des inscrits : connexion Supabase en échec (\(st)) depuis le \(f(dep)) : les inscriptions arrivent en retard")
+            r.append(L("Service des inscrits : connexion Supabase en échec (\(st)) depuis le \(f(dep)) : les inscriptions arrivent en retard"))
         }
         if let d = disqueLibre, d < seuilDisque {
-            r.append("Disque : \(String(format: "%.1f", Double(d) / 1e9).replacingOccurrences(of: ".", with: ",")) Go libres sur /System/Volumes/Data (seuil 10 Go)")
+            let libres = (Double(d) / 1e9).formatted(.number.precision(.fractionLength(1)).locale(Loc.locale))   // « 9,1 » ou « 9.1 »
+            r.append(L("Disque : \(libres) Go libres sur /System/Volumes/Data (seuil 10 Go)"))
         }
         if let w = whatsapp, secondesOuvrees(de: w, a: maintenant, calendrier: calendrier) > seuilWhatsApp {
-            r.append("WhatsApp : dernier message reçu il y a \(ecoule(maintenant.timeIntervalSince(w))) (plus de 24 h ouvrées) : WhatsApp Mac est peut-être fermé")
+            r.append(L("WhatsApp : dernier message reçu il y a \(ecoule(maintenant.timeIntervalSince(w))) (plus de 24 h ouvrées) : WhatsApp Mac est peut-être fermé"))
         }
         return r
     }
 
     private static func lignes(nomsEtDates: [(String, Date?)], maintenant: Date, calendrier: Calendar) -> [String] {
         nomsEtDates.compactMap { nom, d in
-            guard let d else { return "\(nom) : aucune trace (fichier d'état absent)" }
+            guard let d else { return L("\(nom) : aucune trace (fichier d'état absent)") }
             guard secondesActives(de: d, a: maintenant, calendrier: calendrier) > seuilCourt else { return nil }
-            let fm = DateFormatter(); fm.locale = Locale(identifier: "fr_FR"); fm.timeZone = calendrier.timeZone; fm.dateFormat = "dd/MM 'à' HH:mm"
-            return "\(nom) : rien écrit depuis le \(fm.string(from: d)) (plus de 30 min dans la plage 7 h-23 h)"
+            return L("\(nom) : rien écrit depuis le \(jourHeure(d, calendrier)) (plus de \(texteLimite(seuilCourt)) dans la plage 7 h-23 h)")
         }
     }
 
     /// Ligne d'information pour `pilote controle` : le dernier message WhatsApp reçu.
     static func ligneWhatsApp(_ w: Date?, maintenant: Date = Date()) -> String {
-        guard let w else { return "WhatsApp : dernier message reçu illisible (pas encore relevé par le capteur)" }
-        return "WhatsApp : dernier message reçu il y a \(ecoule(maintenant.timeIntervalSince(w)))"
+        guard let w else { return L("WhatsApp : dernier message reçu illisible (pas encore relevé par le capteur)") }
+        return L("WhatsApp : dernier message reçu il y a \(ecoule(maintenant.timeIntervalSince(w)))")
     }
 
     /// Espace libre de /System/Volumes/Data (octets), ou nil.

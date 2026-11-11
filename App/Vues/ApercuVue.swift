@@ -24,7 +24,7 @@ struct ApercuVue: View {
             entete
             Rectangle().fill(Color.separateur).frame(height: 0.5)
             if !existe {
-                EtatErreur(texte: "Fichier introuvable : \(Chemins.court(chemin))")
+                EtatErreur(texte: L("Fichier introuvable : \(Chemins.court(chemin))"))
                 Spacer()
             } else if estDossier {
                 ListeDossier(chemin: chemin)
@@ -170,7 +170,7 @@ struct ListeDossier: View {
         let liste = elements
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if liste.isEmpty { EtatVide(texte: "Dossier vide.") }
+                if liste.isEmpty { EtatVide(texte: L("Dossier vide.")) }
                 ForEach(Array(liste.enumerated()), id: \.element.url) { i, e in
                     Button { etat.apercu = e.url.path } label: {
                         HStack(spacing: 10) {
@@ -178,7 +178,7 @@ struct ListeDossier: View {
                                 .frame(width: 18)
                             Text(e.url.lastPathComponent).font(.ligne).foregroundStyle(Color.texte).lineLimit(1)
                             Spacer()
-                            Text(e.date.formatted(.dateTime.day().month(.abbreviated))).font(.petit).foregroundStyle(Color.texte3)
+                            Text(Loc.date(e.date, "dMMM")).font(.petit).foregroundStyle(Color.texte3)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .contentShape(Rectangle())

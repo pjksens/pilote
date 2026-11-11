@@ -6,8 +6,8 @@ import Foundation
 
 /// Les objectifs que les tâches de demain doivent faire avancer (à adapter aux vôtres).
 enum ObjectifsCap {
-    static let kryva = "Des artisans payants sur KRYVA"
-    static let freelance = "3 à 4 clients freelance signés par mois"
+    static var kryva: String { L("Des artisans payants sur KRYVA") }
+    static var freelance: String { L("3 à 4 clients freelance signés par mois") }
 }
 
 /// Qui comble un trou : le nom d'équipe (EQUIPE.md, `SESSIONS` de scripts/facteur.py) ; vide = Sacha lui-même.
@@ -20,9 +20,9 @@ enum Comble {
 
     static func court(_ qui: String) -> String {
         switch qui {
-        case reseaux: return "Réseaux"
-        case ventes: return "Ventes"
-        case sacha: return "vous"
+        case reseaux: return L("Réseaux")
+        case ventes: return L("Ventes")
+        case sacha: return L("vous")
         default: return qui
         }
     }
@@ -89,15 +89,21 @@ enum DemainPret {
         return "demain-\(jour)"
     }
 
-    /// « mer. 4 nov. »
+    /// « mer. 4 nov. » (« Wed, Nov 4 », « mié, 4 nov »), dans la langue de l'app.
     static func libelleJour(_ jour: String) -> String {
         guard let d = Dates.jour.date(from: jour) else { return jour }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.timeZone = TimeZone(identifier: "Europe/Paris")
-        f.dateFormat = "EEE d MMM"
-        return f.string(from: d)
+        return Loc.date(d, "EEEdMMM")
     }
+
+    /// « mer. 4 » : le jour de la semaine et le quantième, sans le mois.
+    static func libelleJourCourt(_ jour: String) -> String {
+        guard let d = Dates.jour.date(from: jour) else { return jour }
+        return Loc.date(d, "EEEd")
+    }
+
+    /// Fait tourner `travail` en français, quelle que soit la langue de l'app : pour un texte qui part vers une session ou
+    /// qui s'écrit en base (les équipes d'agents travaillent en français). À lancer sur le fil principal, sans attendre dedans.
+    static func enFrancais<T>(_ travail: () -> T) -> T { Loc.enFrancais(travail) }
 
     /// Le contrôle. `taches` nil = Rappels pas encore lus ; `accesRappels` false = Pilote n'a pas accès à Rappels.
     static func controler(aujourdhui: String, videos: [Video], contacts: [Contact], messages: [MessageDemain],
@@ -107,8 +113,8 @@ enum DemainPret {
         let dimanche = estDimanche(aujourdhui)
         var points: [PointDemain] = VideoVocabulaire.comptes.map { pointVideo(videos, jour: jour, compte: $0.0, libelle: $0.1) }
         if dimanche { points += pointsSemaine(videos, jour: jour) }
-        points.append(pointProspects(contacts, messages, jour: jour, espace: "kryva", titre: "Prospects KRYVA", qui: Comble.ventes))
-        points.append(pointProspects(contacts, messages, jour: jour, espace: "freelance", titre: "Prospects freelance", qui: Comble.freelance))
+        points.append(pointProspects(contacts, messages, jour: jour, espace: "kryva", titre: L("Prospects KRYVA"), qui: Comble.ventes))
+        points.append(pointProspects(contacts, messages, jour: jour, espace: "freelance", titre: L("Prospects freelance"), qui: Comble.freelance))
         points += pointsTaches(taches, accesRappels: accesRappels, jour: jour)
         points.append(pointDecisions(ouvertes: decisionsOuvertes, enAttente: reponsesEnAttente))
         return BilanDemain(jour: jour, dimanche: dimanche, points: points, complet: taches != nil || !accesRappels)
@@ -118,20 +124,20 @@ enum DemainPret {
 
     static func pointVideo(_ videos: [Video], jour: String, compte: String, libelle: String) -> PointDemain {
         let v = videos.first { $0.jour == jour && $0.compte == compte }
-        let titre = "Vidéo \(compte == "perso" ? "perso" : libelle)"
-        let regle = "Règle du 03/11 : tournée et montée la veille, donc « Prête » le soir. Annulée = décidé, rien à préparer."
+        let titre = L("Vidéo \(compte == "perso" ? L("perso") : libelle)")
+        let regle = L("Règle du 03/11 : tournée et montée la veille, donc « Prête » le soir. Annulée = décidé, rien à préparer.")
         func point(_ ok: Bool, _ detail: String) -> PointDemain {
             PointDemain(id: "video-\(compte)", titre: titre, ok: ok, detail: detail, qui: Comble.reseaux, regle: regle)
         }
         guard let v, v.statut != "a_choisir", !v.sujet.isEmpty else {
-            let note = v.map { $0.sujet.isEmpty ? "" : " (\($0.sujet))" } ?? ""
-            return point(false, "Aucun sujet validé\(note)")
+            if let sujet = v?.sujet, !sujet.isEmpty { return point(false, L("Aucun sujet validé (\(sujet))")) }
+            return point(false, L("Aucun sujet validé"))
         }
         switch v.statut {
-        case "prete", "publiee": return point(true, "Prête : \(v.sujet)")
-        case "annulee": return point(true, "Annulée, rien à préparer")
-        case "tournee": return point(false, "Tournée, montage pas fini : \(v.sujet)")
-        default: return point(false, "Sujet validé, pas encore tournée : \(v.sujet)")
+        case "prete", "publiee": return point(true, L("Prête : \(v.sujet)"))
+        case "annulee": return point(true, L("Annulée, rien à préparer"))
+        case "tournee": return point(false, L("Tournée, montage pas fini : \(v.sujet)"))
+        default: return point(false, L("Sujet validé, pas encore tournée : \(v.sujet)"))
         }
     }
 
@@ -147,26 +153,25 @@ enum DemainPret {
             }
             valides += semaine.count - jours.count
             if !jours.isEmpty {
-                manquent.append("\(libelle) " + jours.map { libelleJour($0).split(separator: " ").prefix(2).joined(separator: " ") }
-                    .joined(separator: ", "))
+                manquent.append("\(libelle) " + jours.map { libelleJourCourt($0) }.joined(separator: ", "))
             }
         }
         let total = semaine.count * VideoVocabulaire.comptes.count
         let sujets = PointDemain(
-            id: "semaine-sujets", titre: "Sujets de la semaine", ok: manquent.isEmpty,
-            detail: manquent.isEmpty ? "\(total) sur \(total) validés"
-                : "\(valides) sur \(total) validés. Manquent : \(manquent.joined(separator: " · "))",
-            qui: Comble.reseaux, regle: "Le dimanche : 5 sujets KRYVA + 5 perso validés pour la semaine du \(libelleJour(semaine.first ?? jour)).")
+            id: "semaine-sujets", titre: L("Sujets de la semaine"), ok: manquent.isEmpty,
+            detail: manquent.isEmpty ? L("\(total) sur \(total) validés")
+                : L("\(valides) sur \(total) validés. Manquent : \(manquent.joined(separator: " · "))"),
+            qui: Comble.reseaux, regle: L("Le dimanche : 5 sujets KRYVA + 5 perso validés pour la semaine du \(libelleJour(semaine.first ?? jour))."))
         let reserve = VideoVocabulaire.comptes.map { compte, libelle in
             (libelle, videos.filter { $0.jour.isEmpty && $0.compte == compte && !$0.sujet.isEmpty
                 && ["valide", "tournee", "prete"].contains($0.statut) }.count)
         }
         let sansReserve = reserve.filter { $0.1 == 0 }.map(\.0)
+        let comptes = reserve.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
         let pointReserve = PointDemain(
-            id: "semaine-reserve", titre: "Sujets de réserve", ok: sansReserve.isEmpty,
-            detail: reserve.map { "\($0.0) \($0.1)" }.joined(separator: " · ")
-                + (sansReserve.isEmpty ? "" : ". Manque : \(sansReserve.joined(separator: ", "))"),
-            qui: Comble.reseaux, regle: "Le dimanche : au moins 1 sujet de réserve validé par compte.")
+            id: "semaine-reserve", titre: L("Sujets de réserve"), ok: sansReserve.isEmpty,
+            detail: sansReserve.isEmpty ? comptes : L("\(comptes). Manque : \(sansReserve.joined(separator: ", "))"),
+            qui: Comble.reseaux, regle: L("Le dimanche : au moins 1 sujet de réserve validé par compte."))
         return [sujets, pointReserve]
     }
 
@@ -181,28 +186,27 @@ enum DemainPret {
         let aValider = duJour.filter { $0.statut == "a_valider" }.count
         let aRefaire = messages.filter { $0.espace == espace && $0.statut == "a_refaire" && !$0.jour.isEmpty && $0.jour <= jour }
         var morceaux: [String] = []
-        morceaux.append(prevus == 1 ? "1 contact prévu" : "\(prevus) contacts prévus")
+        morceaux.append(prevus == 1 ? L("1 contact prévu") : L("\(prevus) contacts prévus"))
         if prets + aValider > 0 {
-            morceaux.append((prets + aValider == 1 ? "1 message préparé" : "\(prets + aValider) messages préparés")
-                + (aValider > 0 ? " (dont \(aValider) à valider par vous)" : ""))
+            morceaux.append((prets + aValider == 1 ? L("1 message préparé") : L("\(prets + aValider) messages préparés"))
+                + (aValider > 0 ? " " + L("(dont \(aValider) à valider par vous)") : ""))
         }
         var ok = true
         if prevus == 0 && prets + aValider == 0 {
             ok = false
-            morceaux = ["Aucune liste pour demain"]
+            morceaux = [L("Aucune liste pour demain")]
         } else if prets + aValider == 0 {
             ok = false
-            morceaux.append("aucun message préparé")
+            morceaux.append(L("aucun message préparé"))
         }
         if !aRefaire.isEmpty {
             ok = false
             let noms = aRefaire.map(\.nom).filter { !$0.isEmpty }.prefix(2).joined(separator: ", ")
-            morceaux.append((aRefaire.count == 1 ? "1 texte renvoyé pas encore refait" : "\(aRefaire.count) textes renvoyés pas encore refaits")
+            morceaux.append((aRefaire.count == 1 ? L("1 texte renvoyé pas encore refait") : L("\(aRefaire.count) textes renvoyés pas encore refaits"))
                 + (noms.isEmpty ? "" : " (\(noms))"))
         }
         return PointDemain(id: "prospects-\(espace)", titre: titre, ok: ok, detail: morceaux.joined(separator: " · "), qui: qui,
-                           regle: "Les contacts dont la prochaine date est demain, et les messages prévus demain (préparés ou à valider). "
-                               + "Un texte renvoyé à l'agent et pas refait est un trou.")
+                           regle: L("Les contacts dont la prochaine date est demain, et les messages prévus demain (préparés ou à valider). Un texte renvoyé à l'agent et pas refait est un trou."))
     }
 
     // MARK: Tâches : au moins une tâche de demain qui fait avancer chaque objectif
@@ -219,20 +223,21 @@ enum DemainPret {
 
     static func pointsTaches(_ taches: [TacheDemain]?, accesRappels: Bool, jour: String) -> [PointDemain] {
         let objectifs: [(id: String, titre: String, listes: [String], objectif: String)] = [
-            ("taches-freelance", "Tâche pour les clients freelance", ["Freelance"], ObjectifsCap.freelance),
-            ("taches-kryva", "Tâche pour les clients KRYVA", ["KRYVA", "Appels"], ObjectifsCap.kryva),
+            ("taches-freelance", L("Tâche pour les clients freelance"), ["Freelance"], ObjectifsCap.freelance),
+            ("taches-kryva", L("Tâche pour les clients KRYVA"), ["KRYVA", "Appels"], ObjectifsCap.kryva),
         ]
         return objectifs.map { o in
-            let regle = "Objectif : \(o.objectif). Compte : un rappel non coché de demain dans « \(o.listes.joined(separator: " » ou « ")) » "
-                + "dont le titre ou le « But : » parle d'appel, relance, envoi, mail, DM, devis, facture, client…"
+            let regle = o.listes.count == 1
+                ? L("Objectif : \(o.objectif). Compte : un rappel non coché de demain dans « \(o.listes[0]) » dont le titre ou le « But : » parle d'appel, relance, envoi, mail, DM, devis, facture, client…")
+                : L("Objectif : \(o.objectif). Compte : un rappel non coché de demain dans « \(o.listes[0]) » ou « \(o.listes[1]) » dont le titre ou le « But : » parle d'appel, relance, envoi, mail, DM, devis, facture, client…")
             guard accesRappels else {
-                return PointDemain(id: o.id, titre: o.titre, ok: false, detail: "Pilote n'a pas accès à Rappels", qui: Comble.pilote, regle: regle)
+                return PointDemain(id: o.id, titre: o.titre, ok: false, detail: L("Pilote n'a pas accès à Rappels"), qui: Comble.pilote, regle: regle)
             }
             guard let taches else {
-                return PointDemain(id: o.id, titre: o.titre, ok: false, detail: "Lecture des Rappels…", qui: Comble.pilote, regle: regle)
+                return PointDemain(id: o.id, titre: o.titre, ok: false, detail: L("Lecture des Rappels…"), qui: Comble.pilote, regle: regle)
             }
             let utiles = taches.filter { $0.jour == jour && o.listes.contains($0.liste) && faitAvancer($0) }
-            let detail = utiles.isEmpty ? "Aucune tâche de demain ne fait avancer « \(o.objectif) »"
+            let detail = utiles.isEmpty ? L("Aucune tâche de demain ne fait avancer « \(o.objectif) »")
                 : utiles.prefix(2).map(\.titre).joined(separator: " · ") + (utiles.count > 2 ? " · +\(utiles.count - 2)" : "")
             return PointDemain(id: o.id, titre: o.titre, ok: !utiles.isEmpty, detail: detail, qui: Comble.pilote, regle: regle)
         }
@@ -242,11 +247,11 @@ enum DemainPret {
 
     static func pointDecisions(ouvertes: Int, enAttente: Int) -> PointDemain {
         var morceaux: [String] = []
-        if ouvertes > 0 { morceaux.append(ouvertes == 1 ? "1 décision à prendre" : "\(ouvertes) décisions à prendre") }
-        if enAttente > 0 { morceaux.append(enAttente == 1 ? "1 réponse pas envoyée" : "\(enAttente) réponses pas envoyées") }
-        return PointDemain(id: "decisions", titre: "Décisions du jour", ok: morceaux.isEmpty,
-                           detail: morceaux.isEmpty ? "Toutes répondues et envoyées" : morceaux.joined(separator: " · "),
+        if ouvertes > 0 { morceaux.append(ouvertes == 1 ? L("1 décision à prendre") : L("\(ouvertes) décisions à prendre")) }
+        if enAttente > 0 { morceaux.append(enAttente == 1 ? L("1 réponse pas envoyée") : L("\(enAttente) réponses pas envoyées")) }
+        return PointDemain(id: "decisions", titre: L("Décisions du jour"), ok: morceaux.isEmpty,
+                           detail: morceaux.isEmpty ? L("Toutes répondues et envoyées") : morceaux.joined(separator: " · "),
                            qui: Comble.sacha,
-                           regle: "Les ❓ du jour et les questions des sessions répondues, et « Vos réponses, prêtes à partir » vide.")
+                           regle: L("Les ❓ du jour et les questions des sessions répondues, et « Vos réponses, prêtes à partir » vide."))
     }
 }

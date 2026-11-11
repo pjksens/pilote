@@ -154,7 +154,7 @@ them. For each item, only write what you actually verified.
   <br><sub>Demo mode (<code>./scripts/demo.sh</code>): invented data, no real people.</sub>
 </p>
 
-> The app's interface and its code comments are in French. This README exists in nine languages; the app does not (yet).
+> The app follows your Mac's language: English, French or Spanish (English for any other language). Code comments, the `pilote` command-line tool and the MCP server stay in French. This README exists in nine languages.
 
 ## What Pilote does
 
@@ -172,6 +172,7 @@ them. For each item, only write what you actually verified.
   (⌘K) across projects, contacts, journal and files (Spotlight).
 - **Email under control.** A prepared email leaves only when you click, from your Gmail (SMTP, app password kept in the
   macOS keychain, never read by Claude). Plain text, replies stay in the right thread.
+- **Pip, optional.** If [Pip](https://github.com/pjksens/heypip) (a Mac notch app that follows calls) is installed, a “Launch Pip” button appears on a video call from your calendar: Pip opens with the call's name and the linked contact. Optionally Pilote opens it by itself two minutes before. Pip only records after your own click, and once Claude has written the call's summary, Pilote files it in the contact's thread. It reads your calendar, so it follows `rappels_calendrier`, off by default.
 - **Publishing.** Schedule videos on YouTube, Instagram and TikTok, with an explicit approval before each one goes out
   (tokens in the keychain).
 - **Radar.** Watch social media accounts (views, posting rhythm, ideas), entered by hand or through a paid source that
@@ -187,7 +188,7 @@ Your sessions do the work; Pilote is where you see it and where you answer them.
 </p>
 
 When a session needs a decision, its question shows up on the home screen with its buttons. Your answer waits in
-**“Vos réponses, prêtes à partir”** (your answers, ready to go) until you click **Envoyer** (send): nothing reaches a
+**“Your replies, ready to go”** until you click **Send**: nothing reaches a
 session by accident.
 
 <p align="center">
@@ -196,7 +197,7 @@ session by accident.
 </p>
 
 > **How your answers reach the sessions:** [`scripts/facteur.py`](scripts/facteur.py), the “Facteur” (mail carrier).
-> The **Démarrer le Facteur** button on the home screen opens a Claude Code session with its instructions: it waits in
+> The **Start Facteur** button on the home screen opens a Claude Code session with its instructions: it waits in
 > the background and hands each answer to the right session within seconds. That is the session that asked or that you
 > wrote to; otherwise the one named in `facteur.sessions` in `reglages.json`; otherwise the one in the table of
 > `EQUIPE.md`. No session ID is written in the code.
@@ -226,9 +227,9 @@ permission.
 
 | | |
 |---|---|
-| ![Agents: the Claude Code sessions and their journal](docs/captures/10-claude.png) | ![Contacts: the address book, the stage and the next action](docs/captures/04-contacts.png) |
+| ![Agents: the Claude Code sessions and their journal](docs/captures/09-claude.png) | ![Contacts: the address book, the stage and the next action](docs/captures/04-contacts.png) |
 | ![Prospects: the board by stage](docs/captures/03-prospects.png) | ![Videos: the week, two accounts](docs/captures/05-semaine.png) |
-| ![Tasks: drag a card to change its day](docs/captures/08-taches.png) | ![Home screen in dark mode](docs/captures/01-aujourdhui-sombre.png) |
+| ![Tasks: drag a card to change its day](docs/captures/07-taches.png) | ![Home screen in dark mode](docs/captures/01-aujourdhui-sombre.png) |
 
 Every piece of data in the screenshots is invented (names, companies, phone numbers in the French fiction range
 06 39 98 00 0x, addresses in `.example`).
@@ -268,7 +269,7 @@ a key anywhere else.
 
 | Setting | What it turns on |
 |---|---|
-| `prenom` | Your first name in the app (“Camille : rappeler…”). Default: “Vous” (you). |
+| `prenom` | Your first name in the app (“Camille: call back…”). Default: “Vous” (you). |
 | `espaces` | The display names of your workspaces (internal keys `kryva`, `freelance`, `autre`). |
 | `dossiers_sessions`, `routines` | The folders offered when you open a Claude Code session, and your one-click instructions. |
 | `facteur` | Where the Facteur delivers: `sessions` (name → `local_…` ID) and `rappel` (a line added to every message). |
@@ -314,7 +315,7 @@ Postgres role with nothing but `select` on it (see your database's documentation
 security. Do not make the view readable by the `anon` role either: the “anon” key is public in your apps.
 
 **Stripe** (`stripe_cle`, optional): a **restricted key** (`rk_…`) with the single permission “Subscriptions: Read”. It
-tells trials from paying accounts; without it, an account with a subscription shows as “À vérifier” (to check).
+tells trials from paying accounts; without it, an account with a subscription shows as “To check”.
 
 **Counter** (`compteur`, optional): a command of yours, run in `dossier`, that prints a line `ACTIFS 7 / 10`, then
 section titles followed by lines indented by two spaces.

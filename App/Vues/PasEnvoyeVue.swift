@@ -27,8 +27,8 @@ struct FeuillePasEnvoye: View {
     }
 
     private var titre: String {
-        if case .message = cible { return "Pas envoyé : \(contact.titre)" }
-        return "Pas fait : \(contact.titre)"
+        if case .message = cible { return L("Pas envoyé : \(contact.titre)") }
+        return L("Pas fait : \(contact.titre)")
     }
 
     private var consigneObligatoire: Bool { raison == .texteAChanger }
@@ -36,11 +36,11 @@ struct FeuillePasEnvoye: View {
 
     private var explication: String {
         switch raison {
-        case .pasLeMoment: return "Le message reste prêt, la fiche est reportée : il revient le jour choisi."
-        case .texteAChanger: return "Le texte repart à l'agent avec ce que vous écrivez ci-dessous."
+        case .pasLeMoment: return L("Le message reste prêt, la fiche est reportée : il revient le jour choisi.")
+        case .texteAChanger: return L("Le texte repart à l'agent avec ce que vous écrivez ci-dessous.")
         case .plusDActualite:
-            if case .message = cible { return "Le message est annulé. La fiche ne bouge pas : la ligne du jour reste pour décider de la suite." }
-            return "L'action est abandonnée et la date se libère. La raison reste dans le fil."
+            if case .message = cible { return L("Le message est annulé. La fiche ne bouge pas : la ligne du jour reste pour décider de la suite.") }
+            return L("L'action est abandonnée et la date se libère. La raison reste dans le fil.")
         }
     }
 
@@ -48,7 +48,7 @@ struct FeuillePasEnvoye: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(titre).font(.titreSection).foregroundStyle(Color.texte).lineLimit(2)
             Picker("Raison", selection: $raison) {
-                ForEach(raisons) { Text($0.rawValue).tag($0) }
+                ForEach(raisons) { Text($0.libelle).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden()
             Text(explication).font(.secondaire).foregroundStyle(Color.texte2)
@@ -57,7 +57,7 @@ struct FeuillePasEnvoye: View {
                     .datePickerStyle(.compact)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(consigneObligatoire ? "Ce qu'il faut changer" : "Pourquoi ? (facultatif)")
+                Text(consigneObligatoire ? L("Ce qu'il faut changer") : L("Pourquoi ? (facultatif)"))
                     .font(.secondaire.weight(.medium)).foregroundStyle(Color.texte2)
                 TextField("", text: $precision, axis: .vertical)
                     .lineLimit(2...5).textFieldStyle(.roundedBorder)

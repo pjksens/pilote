@@ -26,9 +26,9 @@ struct ActiviteSession: Identifiable, Hashable, Codable {
 
     var libelleEtat: String {
         switch etat {
-        case "busy": return "Au travail"
-        case "waiting": return "Attend votre réponse"
-        default: return "En pause"
+        case "busy": return L("Au travail")
+        case "waiting": return L("Attend votre réponse")
+        default: return L("En pause")
         }
     }
 }
@@ -208,7 +208,9 @@ enum Sessions {
                     if nom == "AskUserQuestion", let q = (entree["questions"] as? [[String: Any]])?.first,
                        let texte = (q["question"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !texte.isEmpty {
                         let n = (entree["questions"] as? [[String: Any]])?.count ?? 1
-                        r.question = texte + (n > 1 ? " (+ \(n - 1) autre\(n > 2 ? "s" : "") dans la session)" : "")
+                        // Deux phrases entières (pas un pluriel du catalogue) : ce code se teste sans catalogue embarqué.
+                        let suite = n > 2 ? L("(+ \(n - 1) autres dans la session)") : L("(+ 1 autre dans la session)")
+                        r.question = texte + (n > 1 ? " " + suite : "")
                         r.choix = (q["options"] as? [[String: Any]] ?? []).compactMap {
                             ($0["label"] as? String).map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
                         }
@@ -251,7 +253,27 @@ enum Sessions {
         return trouvee
     }
 
-    /// Les boutons d'un wrap_up : le libellé écrit, sinon le nom de l'action de l'app, en français.
+    /// Un choix tel que l'écran l'affiche. La valeur du choix reste en français (c'est la réponse écrite à la session, qui
+    /// travaille en français) ; seuls les choix que l'app fabrique elle-même (Oui / Non, boutons d'un wrap_up) se traduisent.
+    /// Un libellé écrit par la session reste tel quel.
+    static func libelleChoix(_ choix: String) -> String {
+        switch choix {
+        case "Oui": return L("Oui")
+        case "Non": return L("Non")
+        case "Ouvrir la PR": return L("Ouvrir la PR")
+        case "Fusionner": return L("Fusionner")
+        case "Réparer la CI": return L("Réparer la CI")
+        case "Traiter les commentaires": return L("Traiter les commentaires")
+        case "Résoudre les conflits": return L("Résoudre les conflits")
+        case "Vérifier": return L("Vérifier")
+        case "Archiver": return L("Archiver")
+        case "Nouvelle session": return L("Nouvelle session")
+        default: return choix
+        }
+    }
+
+    /// Les boutons d'un wrap_up : le libellé écrit, sinon le nom de l'action de l'app, en français (valeur envoyée à la
+    /// session, voir `libelleChoix` pour l'affichage).
     static func boutons(_ v: Any?) -> [String] {
         let noms = ["commit": "Commit", "create_pr": "Ouvrir la PR", "merge": "Fusionner", "fix_ci": "Réparer la CI",
                     "address_comments": "Traiter les commentaires", "resolve_conflicts": "Résoudre les conflits",
@@ -293,10 +315,10 @@ enum Sessions {
         // Message d'une autre session : on garde l'expéditeur et le texte.
         if t.hasPrefix("<cross-session-message") {
             let nom = t.range(of: #"from-name="([^"]*)""#, options: .regularExpression)
-                .map { String(t[$0]).replacingOccurrences(of: "from-name=", with: "").replacingOccurrences(of: "\"", with: "") } ?? "une autre session"
+                .map { String(t[$0]).replacingOccurrences(of: "from-name=", with: "").replacingOccurrences(of: "\"", with: "") } ?? L("une autre session")
             let corps = t.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return String("Message de \(nom) : \(corps)".prefix(400))
+            return String(L("Message de \(nom) : \(corps)").prefix(400))
         }
         guard !t.isEmpty, !t.hasPrefix("<"), !t.hasPrefix("Caveat:"), !t.hasPrefix("[Request interrupted") else { return nil }
         return String(t.prefix(400))
@@ -307,18 +329,18 @@ enum Sessions {
         func base(_ k: String) -> String { ((e[k] as? String ?? "") as NSString).lastPathComponent }
         if let d = e["description"] as? String, !d.isEmpty, nom != "Agent" { return d }
         switch nom {
-        case "Read": return "Lit \(base("file_path"))"
-        case "Write": return "Écrit \(base("file_path"))"
-        case "Edit": return "Modifie \(base("file_path"))"
-        case "Grep", "Glob": return "Cherche « \(e["pattern"] as? String ?? "") »"
-        case "WebSearch": return "Cherche sur le web : \(e["query"] as? String ?? "")"
-        case "WebFetch": return "Lit une page web"
-        case "Agent": return "Confie à un agent : \(e["description"] as? String ?? "")"
-        case "Skill": return "Utilise la compétence \(e["skill"] as? String ?? "")"
+        case "Read": return L("Lit \(base("file_path"))")
+        case "Write": return L("Écrit \(base("file_path"))")
+        case "Edit": return L("Modifie \(base("file_path"))")
+        case "Grep", "Glob": return L("Cherche « \(e["pattern"] as? String ?? "") »")
+        case "WebSearch": return L("Cherche sur le web : \(e["query"] as? String ?? "")")
+        case "WebFetch": return L("Lit une page web")
+        case "Agent": return L("Confie à un agent : \(e["description"] as? String ?? "")")
+        case "Skill": return L("Utilise la compétence \(e["skill"] as? String ?? "")")
         default:
             if nom.hasPrefix("mcp__") {
                 let outil = nom.components(separatedBy: "__").last ?? nom
-                return "Outil \(outil.replacingOccurrences(of: "_", with: " "))"
+                return L("Outil \(outil.replacingOccurrences(of: "_", with: " "))")
             }
             return nom
         }

@@ -15,7 +15,7 @@ struct CarteFileEnvoi: View {
 
     var body: some View {
         if !etat.candidatsFile.isEmpty || !etat.fileEnvoi.isEmpty {
-            Carte(titre: "Envoi des mails", detail: detail) {
+            Carte(titre: L("Envoi des mails"), detail: detail) {
                 if !actifs.isEmpty {
                     ForEach(actifs) { x in LigneCarte { LigneFile(element: x) } }
                 }
@@ -23,7 +23,7 @@ struct CarteFileEnvoi: View {
                     ForEach(passes.reversed()) { x in LigneCarte { LigneFile(element: x) } }
                 }
                 HStack(spacing: 10) {
-                    BoutonPrincipal(titre: prets.isEmpty ? "Envoyer les mails validés" : "Envoyer les mails validés (\(prets.count))",
+                    BoutonPrincipal(titre: prets.isEmpty ? L("Envoyer les mails validés") : L("Envoyer les mails validés (\(prets.count))"),
                                     symbole: "paperplane") { feuille = true }
                         .disabled(etat.candidatsFile.isEmpty)
                     if !actifs.isEmpty {
@@ -41,10 +41,10 @@ struct CarteFileEnvoi: View {
 
     private var detail: String? {
         if let p = actifs.first {
-            return "\(actifs.count) en attente · prochain vers \(heureFile(p.prevuLe))"
+            return L("\(actifs.count) en attente · prochain vers \(heureFile(p.prevuLe))")
         }
         let partis = passes.filter { $0.etat == "envoye" }.count
-        return passes.isEmpty ? "un mail toutes les 5 minutes, depuis votre Gmail" : "\(partis) parti(s) aujourd'hui"
+        return passes.isEmpty ? L("un mail toutes les 5 minutes, depuis votre Gmail") : L("\(partis) partis aujourd'hui")
     }
 }
 
@@ -70,13 +70,13 @@ struct LigneFile: View {
 
     private var libelle: String {
         switch element.etat {
-        case "attente": return "part vers \(heureFile(element.prevuLe))"
-        case "envoi": return "envoi en cours"
-        case "envoye": return "parti à \(heureFile(element.faitLe))"
-        case "refuse": return "sauté"
-        case "echec": return "pas parti"
-        case "incertain": return "à vérifier"
-        case "annule": return "annulé"
+        case "attente": return L("part vers \(heureFile(element.prevuLe))")
+        case "envoi": return L("envoi en cours")
+        case "envoye": return L("parti à \(heureFile(element.faitLe))")
+        case "refuse": return L("sauté")
+        case "echec": return L("pas parti")
+        case "incertain": return L("à vérifier")
+        case "annule": return L("annulé")
         default: return element.etat
         }
     }
@@ -107,7 +107,7 @@ struct FeuilleFileEnvoi: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Envoyer les mails validés").font(.system(size: 19, weight: .semibold))
-            Text("De : \(Gmail.adresse ?? "Gmail non connecté")").font(.secondaire.weight(.medium)).foregroundStyle(Color.texte2)
+            Text("De : \(Gmail.adresse ?? L("Gmail non connecté"))").font(.secondaire.weight(.medium)).foregroundStyle(Color.texte2)
             Text(calendrier).font(.secondaire).foregroundStyle(Color.texte2)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -118,7 +118,7 @@ struct FeuilleFileEnvoi: View {
                                 HStack(spacing: 6) {
                                     Text(EnvoiPilote.nomContact(c.contact)).font(.ligneForte)
                                     Text(c.contact.email).font(.secondaire).foregroundStyle(Color.texte2)
-                                    if c.plusTard { Pastille(texte: "prévu le \(Dates.jjmm(c.jour))", couleur: .texte2) }
+                                    if c.plusTard { Pastille(texte: L("prévu le \(Dates.jjmm(c.jour))"), couleur: .texte2) }
                                 }
                                 Text("Objet : \(c.evenement.objet)").font(.secondaire).foregroundStyle(Color.texte2)
                                 Text(c.evenement.texte).font(.petit).foregroundStyle(Color.texte2).lineLimit(2)
@@ -130,7 +130,7 @@ struct FeuilleFileEnvoi: View {
                         Text("Ne partiront pas").font(.ligneForte).padding(.top, 6)
                         ForEach(bloques) { c in
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\(EnvoiPilote.nomContact(c.contact)) · \(c.evenement.objet.isEmpty ? "(sans objet)" : c.evenement.objet)")
+                                Text("\(EnvoiPilote.nomContact(c.contact)) · \(c.evenement.objet.isEmpty ? L("(sans objet)") : c.evenement.objet)")
                                     .font(.secondaire.weight(.medium))
                                 Text(c.refus.joined(separator: " ; ")).font(.petit).foregroundStyle(Color.rouge)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +142,7 @@ struct FeuilleFileEnvoi: View {
             }
             .frame(minHeight: 160, maxHeight: 420)
             if verification {
-                EtatChargement(texte: "Vérification de l'envoi automatique…")
+                EtatChargement(texte: L("Vérification de l'envoi automatique…"))
             } else if let acces {
                 Text(acces).font(.secondaire.weight(.medium)).foregroundStyle(Color.rouge).fixedSize(horizontal: false, vertical: true)
             }
@@ -151,7 +151,7 @@ struct FeuilleFileEnvoi: View {
                 Text("SMS et LinkedIn ne partent pas d'ici : vous les envoyez vous-même.").font(.petit).foregroundStyle(Color.texte2)
                 Spacer()
                 Button("Annuler") { fermer() }.keyboardShortcut(.cancelAction)
-                Button(choisis.isEmpty ? "Envoyer" : choisis.count == 1 ? "Envoyer ce mail" : "Envoyer ces \(choisis.count) mails") {
+                Button(choisis.isEmpty ? L("Envoyer") : choisis.count == 1 ? L("Envoyer ce mail") : L("Envoyer ces \(choisis.count) mails")) {
                     envoi = true
                     Task {
                         erreur = await etat.mettreEnFile(choisis)
@@ -173,7 +173,7 @@ struct FeuilleFileEnvoi: View {
             // Ce que l'agent verra une fois l'app fermée : installé, et capable de lire le mot de passe sans fenêtre.
             let r = await Task.detached { () -> String? in
                 if !FileEnvoi.agentCharge() {
-                    return "L'envoi automatique n'est pas installé (agent \(FileEnvoi.etiquette)) : rien ne partirait. Prévenir PILOTE."
+                    return L("L'envoi automatique n'est pas installé (agent \(FileEnvoi.etiquette)) : rien ne partirait. Prévenir PILOTE.")
                 }
                 return FileEnvoi.accesOutil()
             }.value
@@ -185,15 +185,20 @@ struct FeuilleFileEnvoi: View {
     /// « Le premier part tout de suite, puis un toutes les 5 minutes : le dernier vers HH:MM. »
     private var calendrier: String {
         let n = choisis.count
-        guard n > 0 else { return "Cochez les mails à envoyer." }
+        guard n > 0 else { return L("Cochez les mails à envoyer.") }
         var debut = Date()
         let derniers = etat.fileEnvoi.filter { ["envoye", "echec", "incertain"].contains($0.etat) }.compactMap { Dates.iso.date(from: $0.faitLe) }
         let enAttente = etat.fileEnvoi.filter(\.enCours).count
         if let d = derniers.max(), d.addingTimeInterval(FileEnvoi.intervalle) > debut { debut = d.addingTimeInterval(FileEnvoi.intervalle) }
         debut = debut.addingTimeInterval(Double(enAttente) * FileEnvoi.intervalle)
         let fin = debut.addingTimeInterval(Double(n - 1) * FileEnvoi.intervalle)
-        let premier = enAttente > 0 ? "Le premier part après les \(enAttente) déjà en file (vers \(heureFile(debut)))" : "Le premier part tout de suite"
-        return n == 1 ? premier + "." : "\(premier), puis un toutes les 5 minutes : le dernier vers \(heureFile(fin)), même si l'app est fermée."
+        // Une phrase entière par cas (pas de morceaux collés : l'ordre des mots change d'une langue à l'autre).
+        switch (n == 1, enAttente > 0) {
+        case (true, true): return L("Le premier part après les \(enAttente) déjà en file (vers \(heureFile(debut))).")
+        case (true, false): return L("Le premier part tout de suite.")
+        case (false, true): return L("Le premier part après les \(enAttente) déjà en file (vers \(heureFile(debut))), puis un toutes les 5 minutes : le dernier vers \(heureFile(fin)), même si l'app est fermée.")
+        case (false, false): return L("Le premier part tout de suite, puis un toutes les 5 minutes : le dernier vers \(heureFile(fin)), même si l'app est fermée.")
+        }
     }
 }
 
@@ -205,7 +210,7 @@ func heureFile(_ iso: String) -> String {
 
 func heureFile(_ d: Date) -> String {
     let f = DateFormatter()
-    f.locale = Locale(identifier: "fr_FR")
+    f.locale = Loc.locale
     f.timeZone = TimeZone(identifier: "Europe/Paris")
     f.dateFormat = "HH:mm"
     return f.string(from: d)

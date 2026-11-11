@@ -34,11 +34,11 @@ struct NoeudPyramide: Identifiable {
 
     /// « au travail », « attend Sacha », « au repos » ou « hors ligne ».
     var libelleEtat: String {
-        guard let a = activite else { return "hors ligne" }
+        guard let a = activite else { return L("hors ligne") }
         switch a.etat {
-        case "busy": return "au travail"
-        case "waiting": return "attend \(Moi.nom)"
-        default: return "au repos"
+        case "busy": return L("au travail")
+        case "waiting": return L("attend Sacha")
+        default: return L("au repos")
         }
     }
 
@@ -217,9 +217,9 @@ enum Equipe {
         guard let a = activite else { return [] }
         var b: [String] = []
         if niveau == .chantier, a.etat == "idle", let d = a.depuis, maintenant.timeIntervalSince(d) > delaiArchivage {
-            b.append("À valider puis archiver")
+            b.append(L("À valider puis archiver"))
         }
-        if a.contexte >= seuilRelais { b.append("Relais") }
+        if a.contexte >= seuilRelais { b.append(L("Relais")) }
         return b
     }
 
@@ -249,13 +249,13 @@ enum Equipe {
             }
         }
         if !sousPilote.isEmpty {
-            p.colonnes.append(ColonnePyramide(id: "sous-pilote", titre: "Directement sous PILOTE", tete: nil, chantiers: sousPilote))
+            p.colonnes.append(ColonnePyramide(id: "sous-pilote", titre: L("Directement sous PILOTE"), tete: nil, chantiers: sousPilote))
         }
         for d in domaines {
             p.colonnes.append(ColonnePyramide(id: d.id, titre: d.nom, tete: noeud(d), chantiers: parParent[d.id] ?? []))
         }
         if !sansParent.isEmpty {
-            p.colonnes.append(ColonnePyramide(id: "sans-parent", titre: "Sans session parente", tete: nil, chantiers: sansParent))
+            p.colonnes.append(ColonnePyramide(id: "sans-parent", titre: L("Sans session parente"), tete: nil, chantiers: sansParent))
         }
         let connus = Set(membres.compactMap { $0.sessionApp.isEmpty ? nil : $0.sessionApp })
         p.horsCarte = vivantes.filter { !connus.contains($0.sessionApp) }.map { a in
@@ -274,16 +274,11 @@ enum Equipe {
         f.dateFormat = "HH:mm"
         return f
     }()
-    private static let formatJour: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateFormat = "d MMM HH:mm"
-        return f
-    }()
 
-    /// « 14:02 » aujourd'hui, « 26 oct. 14:02 » sinon.
+    /// « 14:02 » aujourd'hui, « 26 oct. 14:02 » sinon (le jour suit la langue de l'app, l'heure reste en 24 h).
     static func heure(_ d: Date, maintenant: Date = Date()) -> String {
-        Calendar.current.isDate(d, inSameDayAs: maintenant) ? formatHeure.string(from: d) : formatJour.string(from: d)
+        let h = formatHeure.string(from: d)
+        return Calendar.current.isDate(d, inSameDayAs: maintenant) ? h : Loc.date(d, "dMMM") + " " + h
     }
 
     static func court(_ s: String, _ n: Int) -> String {

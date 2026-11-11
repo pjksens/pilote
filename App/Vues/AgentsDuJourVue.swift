@@ -13,10 +13,10 @@ struct CarteAgentsDuJour: View {
         let sansTrace = journees.reduce(0) { $0 + $1.sansTrace.count }
         let restent = journees.reduce(0) { $0 + $1.restantes.count }
         // T5 : trois compteurs, pas un seul « traitée » : fait (preuve au fil ou classée), reporté (date seule), sans trace.
-        Carte(titre: "Les agents aujourd'hui",
-              detail: journees.isEmpty ? nil : "\(faites) faite\(faites > 1 ? "s" : "") · \(reportees) reportée\(reportees > 1 ? "s" : "") · \(sansTrace) sans trace · \(restent) reste\(restent > 1 ? "nt" : "")") {
+        Carte(titre: L("Les agents aujourd'hui"),
+              detail: journees.isEmpty ? nil : [L("\(faites) faites"), L("\(reportees) reportées"), L("\(sansTrace) sans trace"), L("\(restent) restent")].joined(separator: " · ")) {
             if journees.isEmpty {
-                EtatVide(texte: "Aucune fiche sur la liste des agents aujourd'hui.")
+                EtatVide(texte: L("Aucune fiche sur la liste des agents aujourd'hui."))
             }
             ForEach(Array(journees.enumerated()), id: \.element.id) { i, j in
                 LigneCarte(dernier: i == journees.count - 1) { BlocAgent(journee: j) }
@@ -37,7 +37,7 @@ private struct BlocAgent: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(nom).font(.ligneForte).foregroundStyle(Color.texte)
-                Text("\(journee.faites.count) faite\(journee.faites.count > 1 ? "s" : "") · \(journee.reportees.count) reportée\(journee.reportees.count > 1 ? "s" : "") · \(journee.sansTrace.count) sans trace (sur \(total))")
+                Text([L("\(journee.faites.count) faites"), L("\(journee.reportees.count) reportées"), L("\(journee.sansTrace.count) sans trace")].joined(separator: " · ") + " " + L("(sur \(total))"))
                     .font(.secondaire).foregroundStyle(Color.texte2)
                 if journee.reservoir > 0 {
                     Text("\(journee.reservoir) à contacter en réserve")
@@ -45,7 +45,7 @@ private struct BlocAgent: View {
                         .help("Prospects « à contacter » sans date : le stock, hors liste du jour")
                 }
                 if !journee.restantes.isEmpty {
-                    Text("\(journee.restantes.count) reste\(journee.restantes.count > 1 ? "nt" : "")")
+                    Text(L("\(journee.restantes.count) restent"))
                         .font(.secondaire.weight(.semibold)).foregroundStyle(Color.rouge)
                 } else {
                     Label("tout est traité", systemImage: "checkmark").font(.secondaire).foregroundStyle(Color.vert)
@@ -53,7 +53,7 @@ private struct BlocAgent: View {
                 Spacer()
                 if let r = etat.derniereRelance(journee) {
                     let l = Facteur.libelle(r.remise, pour: nom, veille: etat.prochaineVeille)
-                    Text("Relancé à \(r.heure.formatted(date: .omitted, time: .shortened)), \(l.texte)")
+                    Text("Relancé à \(Libelles.heureFormat.string(from: r.heure)), \(l.texte)")
                         .font(.petit).foregroundStyle(Color.texte3).lineLimit(1)
                 }
                 if !journee.restantes.isEmpty {
@@ -101,6 +101,6 @@ private struct LigneFicheAgent: View {
     /// Traitée : la nouvelle action ; restante : l'action qui attend.
     private var action: String {
         let a = Libelles.sansDateEnTete(fiche.contact.prochaineAction).replacingOccurrences(of: "\n", with: " ")
-        return a.isEmpty ? "Aucune prochaine action" : a
+        return a.isEmpty ? L("Aucune prochaine action") : a
     }
 }

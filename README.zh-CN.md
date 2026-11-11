@@ -150,7 +150,7 @@ them. For each item, only write what you actually verified.
   <br><sub>演示模式（<code>./scripts/demo.sh</code>）：全部是虚构数据，没有任何真实的人。</sub>
 </p>
 
-> 应用的界面及其代码注释是法语的。本 README 提供九种语言版本；应用本身（暂时）没有。
+> 应用界面跟随你 Mac 的语言：英语、法语或西班牙语（其他语言显示英语）。代码注释、命令行工具 `pilote` 和 MCP 服务器仍为法语。本 README 提供九种语言版本。
 
 ## Pilote 能做什么
 
@@ -160,6 +160,7 @@ them. For each item, only write what you actually verified.
 - **智能体。** 你的 Mac 上打开的 Claude Code 会话、它们的状态和最近一次动作，以及它们交付内容的日志（由 Claude Code 的 `Stop` 钩子填写）。
 - **你的工作地图。** 每个项目、它的文件夹、它的 `ETAT.md`（状态文件）、它的关键文档；可以在项目、联系人、日志和文件（Spotlight）中搜索一切（⌘K）。
 - **邮件由你掌控。** 准备好的邮件只有在你点击后才会发出，从你自己的 Gmail 发送（SMTP，应用专用密码保存在 macOS 钥匙串中，Claude 永远读不到）。纯文本，回复会留在正确的邮件会话中。
+- **Pip（可选）。** 如果安装了 [Pip](https://github.com/pjksens/heypip)（一个陪伴通话的 Mac 刘海应用），日历里的视频通话上会出现“Launch Pip”按钮：Pip 会带着通话名称和关联的联系人打开。你也可以选择让 Pilote 提前两分钟自动打开它。Pip 只在你亲自点击之后才录音；Claude 写好通话摘要后，Pilote 会把它归入该联系人的记录。它会读取你的日历，因此遵循默认关闭的 `rappels_calendrier`。
 - **发布。** 在 YouTube、Instagram 和 TikTok 上定时发布视频，每一条发出前都需要你明确批准（令牌保存在钥匙串中）。
 - **雷达。** 关注社交媒体账号（播放量、发布节奏、灵感），可手动录入，也可通过付费数据源获取，但没有你的确认它永远不会运行。
 
@@ -172,14 +173,14 @@ them. For each item, only write what you actually verified.
   <br><sub>你的会话正在做什么，以及给其中一个会话发消息，都无需离开 Pilote。</sub>
 </p>
 
-当某个会话需要你做决定时，它的问题会连同选项按钮出现在主屏幕上。你的回答会先放在 **“Vos réponses, prêtes à partir”**（你的回答，随时可发）里，直到你点击 **Envoyer**（发送）：不会有任何内容意外地传到会话那边。
+当某个会话需要你做决定时，它的问题会连同选项按钮出现在主屏幕上。你的回答会先放在 **“Your replies, ready to go”**（你的回答，随时可发）里，直到你点击 **Send**（发送）：不会有任何内容意外地传到会话那边。
 
 <p align="center">
   <img src="docs/media/facteur.gif" width="720" alt="主屏幕上某个会话提出的问题：点一下选择回答，然后点发送">
   <br><sub>会话提问，你一键回答，什么时候发出由你决定。</sub>
 </p>
 
-> **你的回答如何送到会话：** [`scripts/facteur.py`](scripts/facteur.py)，即“Facteur”（邮递员）。主屏幕上的 **Démarrer le Facteur** 按钮会打开一个带有其指令的 Claude Code 会话：它在后台等待，并在几秒内把每个回答送到对应的会话。目标是提出问题的会话或你写给它的会话；否则是 `reglages.json` 中 `facteur.sessions` 指定的会话；再否则是 `EQUIPE.md` 表格中的会话。代码里没有写入任何会话 ID。
+> **你的回答如何送到会话：** [`scripts/facteur.py`](scripts/facteur.py)，即“Facteur”（邮递员）。主屏幕上的 **Start Facteur** 按钮会打开一个带有其指令的 Claude Code 会话：它在后台等待，并在几秒内把每个回答送到对应的会话。目标是提出问题的会话或你写给它的会话；否则是 `reglages.json` 中 `facteur.sessions` 指定的会话；再否则是 `EQUIPE.md` 表格中的会话。代码里没有写入任何会话 ID。
 
 ## 一点提醒
 
@@ -199,9 +200,9 @@ them. For each item, only write what you actually verified.
 
 | | |
 |---|---|
-| ![智能体：Claude Code 会话及其日志](docs/captures/10-claude.png) | ![联系人：通讯录、阶段和下一步行动](docs/captures/04-contacts.png) |
+| ![智能体：Claude Code 会话及其日志](docs/captures/09-claude.png) | ![联系人：通讯录、阶段和下一步行动](docs/captures/04-contacts.png) |
 | ![潜在客户：按阶段划分的看板](docs/captures/03-prospects.png) | ![视频：本周，两个账号](docs/captures/05-semaine.png) |
-| ![任务：拖动卡片即可更改日期](docs/captures/08-taches.png) | ![深色模式下的主屏幕](docs/captures/01-aujourdhui-sombre.png) |
+| ![任务：拖动卡片即可更改日期](docs/captures/07-taches.png) | ![深色模式下的主屏幕](docs/captures/01-aujourdhui-sombre.png) |
 
 截图中的每一项数据都是虚构的（姓名、公司、使用法国虚构号段 06 39 98 00 0x 的电话号码、以 `.example` 结尾的地址）。
 
@@ -272,7 +273,7 @@ from organisations o left join utilisateurs u on u.organisation_id = o.id;
 
 **密钥。** 给 Pilote 的权限要尽可能少：一个只能**读取这个视图**的令牌，例如一个专用的 Postgres 角色，只对该视图拥有 `select` 权限（如何获取绑定到该角色的令牌，请参阅你所用数据库的文档）。**绝对不要使用 Supabase 的 `service_role`（或“secret”）密钥**：它能打开整个数据库、可读可写，并且会绕过行级安全策略。也不要让 `anon` 角色可以读取这个视图：“anon”密钥在你的应用中是公开的。
 
-**Stripe**（`stripe_cle`，可选）：一个**受限密钥**（`rk_…`），只授予“Subscriptions: Read”这一项权限。它用来区分试用账号和付费账号；没有它的话，有订阅的账号会显示为“À vérifier”（待核实）。
+**Stripe**（`stripe_cle`，可选）：一个**受限密钥**（`rk_…`），只授予“Subscriptions: Read”这一项权限。它用来区分试用账号和付费账号；没有它的话，有订阅的账号会显示为“To check”（待核实）。
 
 **计数器**（`compteur`，可选）：你自己的一条命令，在 `dossier` 中运行，输出一行 `ACTIFS 7 / 10`，然后是若干小节标题，每个标题后面跟着缩进两个空格的行。
 

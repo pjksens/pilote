@@ -41,71 +41,71 @@ enum Parcours {
         func depuis(_ j: String) -> String {
             guard let a = Dates.date(j), let b = Dates.date(aujourdhui) else { return "" }
             let n = Calendar.current.dateComponents([.day], from: a, to: b).day ?? 0
-            return n <= 0 ? "aujourd'hui" : "depuis \(n) j"
+            return n <= 0 ? L("aujourd'hui") : L("depuis \(n) j")
         }
 
         var l: [EtapeParcours] = []
-        l.append(EtapeParcours(cle: "base", titre: "En base", etat: .fait, date: Dates.jourDe(c.creeLe), detail: c.source))
+        l.append(EtapeParcours(cle: "base", titre: L("En base"), etat: .fait, date: Dates.jourDe(c.creeLe), detail: c.source))
 
         if linkedin {
             if let i = invitations.last {
-                l.append(EtapeParcours(cle: "invitation", titre: "Invitation", etat: .fait, date: jour(i),
-                                       detail: invitations.count > 1 ? "\(invitations.count) fois" : ""))
+                l.append(EtapeParcours(cle: "invitation", titre: L("Invitation"), etat: .fait, date: jour(i),
+                                       detail: invitations.count > 1 ? L("\(invitations.count) fois") : ""))
             } else {
-                l.append(EtapeParcours(cle: "invitation", titre: "Invitation", etat: .aVenir,
-                                       detail: invitationPrete == nil ? "à préparer" : "prête, à envoyer"))
+                l.append(EtapeParcours(cle: "invitation", titre: L("Invitation"), etat: .aVenir,
+                                       detail: invitationPrete == nil ? L("à préparer") : L("prête, à envoyer")))
             }
             if let a = acceptee {
-                l.append(EtapeParcours(cle: "acceptee", titre: "Acceptée", etat: .fait, date: jour(a)))
+                l.append(EtapeParcours(cle: "acceptee", titre: L("Acceptée"), etat: .fait, date: jour(a)))
             } else if !invitations.isEmpty {
-                let detail = pasEncore >= Invitation.essais ? "pas encore ×\(pasEncore) : autre canal"
-                    : (pasEncore > 0 ? "pas encore ×\(pasEncore)" : depuis(jour(invitations.last)))
-                l.append(EtapeParcours(cle: "acceptee", titre: "Acceptée ?", etat: .aVenir, detail: detail, attente: true))
+                let detail = pasEncore >= Invitation.essais ? L("pas encore ×\(pasEncore) : autre canal")
+                    : (pasEncore > 0 ? L("pas encore ×\(pasEncore)") : depuis(jour(invitations.last)))
+                l.append(EtapeParcours(cle: "acceptee", titre: L("Acceptée ?"), etat: .aVenir, detail: detail, attente: true))
             } else {
-                l.append(EtapeParcours(cle: "acceptee", titre: "Acceptée ?", etat: .aVenir))
+                l.append(EtapeParcours(cle: "acceptee", titre: L("Acceptée ?"), etat: .aVenir))
             }
         }
 
         if let m = messages.first {
-            l.append(EtapeParcours(cle: "message", titre: "Message", etat: .fait, date: jour(m), detail: Libelles.canal(m.canal)))
+            l.append(EtapeParcours(cle: "message", titre: L("Message"), etat: .fait, date: jour(m), detail: Libelles.canal(m.canal)))
         } else {
             let detail: String
             switch messagePret?.statut {
-            case "a_valider": detail = "à valider"
-            case "a_refaire": detail = "à refaire"
-            case "prepare": detail = "prêt, à envoyer"
-            default: detail = "à préparer"
+            case "a_valider": detail = L("à valider")
+            case "a_refaire": detail = L("à refaire")
+            case "prepare": detail = L("prêt, à envoyer")
+            default: detail = L("à préparer")
             }
-            l.append(EtapeParcours(cle: "message", titre: "Message", etat: .aVenir, detail: detail))
+            l.append(EtapeParcours(cle: "message", titre: L("Message"), etat: .aVenir, detail: detail))
         }
 
         if let r = reponse {
-            l.append(EtapeParcours(cle: "reponse", titre: "Réponse", etat: .fait, date: jour(r), detail: Libelles.canal(r.canal)))
+            l.append(EtapeParcours(cle: "reponse", titre: L("Réponse"), etat: .fait, date: jour(r), detail: Libelles.canal(r.canal)))
         } else if let m = messages.last {
-            l.append(EtapeParcours(cle: "reponse", titre: "Réponse ?", etat: .aVenir, detail: depuis(jour(m)), attente: true))
+            l.append(EtapeParcours(cle: "reponse", titre: L("Réponse ?"), etat: .aVenir, detail: depuis(jour(m)), attente: true))
         } else {
-            l.append(EtapeParcours(cle: "reponse", titre: "Réponse ?", etat: .aVenir))
+            l.append(EtapeParcours(cle: "reponse", titre: L("Réponse ?"), etat: .aVenir))
         }
 
         // Relance : nécessaire seulement sans réponse ; un 2e envoi ou plus après le premier message en est une.
         if messages.count > 1 {
-            l.append(EtapeParcours(cle: "relance", titre: "Relance", etat: .fait, date: jour(messages.last),
-                                   detail: messages.count > 2 ? "\(messages.count - 1) fois" : ""))
+            l.append(EtapeParcours(cle: "relance", titre: L("Relance"), etat: .fait, date: jour(messages.last),
+                                   detail: messages.count > 2 ? L("\(messages.count - 1) fois") : ""))
         } else if reponse != nil {
-            l.append(EtapeParcours(cle: "relance", titre: "Relance", etat: .saute))
+            l.append(EtapeParcours(cle: "relance", titre: L("Relance"), etat: .saute))
         } else {
-            l.append(EtapeParcours(cle: "relance", titre: "Relance", etat: .aVenir,
-                                   detail: messagePret != nil && !messages.isEmpty ? "prête, à envoyer" : ""))
+            l.append(EtapeParcours(cle: "relance", titre: L("Relance"), etat: .aVenir,
+                                   detail: messagePret != nil && !messages.isEmpty ? L("prête, à envoyer") : ""))
         }
 
         switch c.etape {
-        case "gagne": l.append(EtapeParcours(cle: "fin", titre: "Gagné", etat: .fait))
-        case "perdu": l.append(EtapeParcours(cle: "fin", titre: "Perdu", etat: .fait))
+        case "gagne": l.append(EtapeParcours(cle: "fin", titre: L("Gagné"), etat: .fait))
+        case "perdu": l.append(EtapeParcours(cle: "fin", titre: L("Perdu"), etat: .fait))
         default:
             if let r = rdv ?? (c.etape == "rdv" ? asc.last : nil) {
-                l.append(EtapeParcours(cle: "fin", titre: "Rendez-vous", etat: .fait, date: jour(r)))
+                l.append(EtapeParcours(cle: "fin", titre: L("Rendez-vous"), etat: .fait, date: jour(r)))
             } else {
-                l.append(EtapeParcours(cle: "fin", titre: "Rendez-vous", etat: .aVenir))
+                l.append(EtapeParcours(cle: "fin", titre: L("Rendez-vous"), etat: .aVenir))
             }
         }
 

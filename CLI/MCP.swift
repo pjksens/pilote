@@ -149,6 +149,13 @@ private let outils: [[String: Any]] = [
         "statut": ["type": "string", "enum": ["envoye", "annule", "echec", "a_valider"]],
         "malgre_condition": ["type": "boolean", "description": "Seulement si le message est DÉJÀ parti alors que sa condition n'était pas cochée : il passe à « envoye », le fil le note, le rappel lié reste ouvert."]],
         "required": ["evenement_id", "statut"]]],
+    ["name": "aucune_reponse_due",
+     "description": "La dernière réponse reçue d'un contact n'appelle aucune réponse (« Merci » de fin, message d'attente d'un support) : la fiche sort de « Réponse reçue, à traiter » (liste ambre) jusqu'au prochain message reçu, qui la remet d'office. Le fil note « Aucune réponse due : <pourquoi> ». Refus si le dernier échange n'est pas une réponse reçue. Ne change ni l'étape ni la prochaine action.",
+     "inputSchema": ["type": "object", "properties": [
+        "contact_id": ["type": "string"],
+        "pourquoi": ["type": "string", "description": "En quelques mots : « Merci de fin d'échange », « Message d'attente du support »…"],
+        "par": ["type": "string", "description": "L'agent qui marque (Ventes, FREELANCE…)."]],
+        "required": ["contact_id", "pourquoi"]]],
     ["name": "a_envoyer",
      "description": "Les messages au statut « prepare » (texte validé par \(Moi.tiers), pas encore partis), du plus ancien au plus récent : id court, contact, canal, objet, début du texte, condition et son état (aucune, à cocher, cochée le …), jour d'envoi prévu, envoyable (l'outil envoie l'accepterait maintenant) et sinon les raisons. Lecture seule.",
      "inputSchema": ["type": "object", "properties": [
@@ -205,7 +212,7 @@ private let outils: [[String: Any]] = [
      "inputSchema": ["type": "object", "properties": [
         "jours": ["type": "integer", "description": "Les terminées des N derniers jours (défaut 30)."]]]],
     ["name": "programme_publication",
-     "description": "PROPOSE une publication (statut a_valider) : rien ne part tant que \(Moi.tiers) ne l'a pas validée. Une ligne par compte. Rend pour chaque ligne le bloc exact à montrer à \(Moi.tiers) (compte, heure, vidéo, titre, texte, empreinte). Refus clairs : heure à moins de 15 min ou à plus de 6 mois, fichier absent, format, titre YouTube vide ou > 100 caractères, légende > 2 200, déjà programmée. Contenu : Réseaux ; jamais un texte que \(Moi.tiers) n'a pas vu.",
+     "description": "PROPOSE une publication (statut a_valider) : rien ne part tant que \(Moi.tiers) ne l'a pas validée. Une ligne par compte. Rend pour chaque ligne le bloc exact à montrer à \(Moi.tiers) (compte, heure, vidéo, titre, texte, empreinte). Refus clairs : heure à moins de 15 min ou à plus de 6 mois, fichier absent, format, titre YouTube vide ou > 100 caractères, légende > 2 200, déjà programmée, vidéo sous la 4K (2160×3840). Instagram et TikTok : leur copie de la vidéo se prépare pendant l'appel (jusqu'à 1 min par réseau quand elle est ré-encodée) : attendre la réponse, ne pas relancer. Contenu : Réseaux ; jamais un texte que \(Moi.tiers) n'a pas vu.",
      "inputSchema": ["type": "object", "properties": [
         "comptes": ["type": "array", "items": ["type": "string", "enum": ["yt-perso", "yt-kryva", "ig-perso", "ig-kryva", "tt-perso", "tt-kryva"]]],
         "fichier": ["type": "string", "description": "Chemin complet de la vidéo (.mp4 ou .mov, verticale)."],
@@ -287,6 +294,11 @@ private func appeler(_ nom: String, _ a: [String: Any], _ stock: Stockage) throw
         guard let id = a["evenement_id"] as? String, let s = a["statut"] as? String else { throw ErreurBase(description: "evenement_id et statut requis") }
         try stock.marquer(evenementId: id, statut: s, malgreCondition: a["malgre_condition"] as? Bool ?? false)
         return "{\"ok\": true}"
+    case "aucune_reponse_due":
+        guard let id = a["contact_id"] as? String else { throw ErreurBase(description: "contact_id manquant") }
+        let note = try stock.marquerAucuneReponseDue(contactId: id, pourquoi: a["pourquoi"] as? String ?? "",
+                                                     par: a["par"] as? String ?? "Claude")
+        return jsonTexte(note)
     case "a_envoyer":
         var lignes = try EnvoiPilote.aEnvoyer(stock, outils: try OutilsEnvoi.selonEnvironnement())
         if a["mail"] as? Bool == true { lignes = lignes.filter { $0.canal == "mail" } }

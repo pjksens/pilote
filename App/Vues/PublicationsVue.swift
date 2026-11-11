@@ -10,6 +10,12 @@ import UniformTypeIdentifiers
 enum OngletPublications: String, CaseIterable, Identifiable {
     case planning = "Planning", liste = "Liste"
     var id: String { rawValue }
+    var titre: String {
+        switch self {
+        case .planning: return L("Planning")
+        case .liste: return L("Liste")
+        }
+    }
 }
 
 struct PublicationsVue: View {
@@ -37,6 +43,7 @@ struct PublicationsVue: View {
     @State private var avecInstant = false
     @State private var instant: Double = 1
     @State private var apercuCouverture: NSImage?
+    @State private var preparation = false
 
     private var aValider: [Publication] { publications.filter { $0.etat == "a_valider" } }
     private var actives: [Publication] { publications.filter { ["planifie", "envoi", "envoye", "reconnexion"].contains($0.etat) } }
@@ -50,16 +57,16 @@ struct PublicationsVue: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .top) {
-                    EnTete(titre: "Publications", detail: "YouTube, Instagram et TikTok, depuis votre Mac.")
+                    EnTete(titre: L("Publications"), detail: L("YouTube, Instagram et TikTok, depuis votre Mac."))
                     Spacer()
                     Picker("", selection: $onglet) {
-                        ForEach(OngletPublications.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(OngletPublications.allCases) { Text($0.titre).tag($0) }
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 .id("haut")
                 if !agentCharge {
-                    EtatErreur(texte: "L'agent de publication n'est pas lancé : rien ne part tant qu'il ne tourne pas.")
+                    EtatErreur(texte: L("L'agent de publication n'est pas lancé : rien ne part tant qu'il ne tourne pas."))
                         .background(Color.surface, in: RoundedRectangle(cornerRadius: 12))
                 }
                 if let erreur { EtatErreur(texte: erreur).background(Color.surface, in: RoundedRectangle(cornerRadius: 12)) }
@@ -110,7 +117,7 @@ struct PublicationsVue: View {
     }
 
     private func charger() {
-        guard let stock = etat.stock else { erreur = "La base de Pilote n'est pas ouverte."; return }
+        guard let stock = etat.stock else { erreur = L("La base de Pilote n'est pas ouverte."); return }
         do {
             comptes = try Publications.comptes(stock)
             publications = try Publications.liste(stock)
@@ -131,7 +138,7 @@ struct PublicationsVue: View {
     // MARK: Comptes
 
     private var carteComptes: some View {
-        Carte(titre: "Comptes", detail: "un clic pour connecter ou reconnecter") {
+        Carte(titre: L("Comptes"), detail: L("un clic pour connecter ou reconnecter")) {
             ForEach(Array(ComptePublication.tous.enumerated()), id: \.element.id) { i, c in
                 LigneCarte(dernier: i == ComptePublication.tous.count - 1) { ligneCompte(c) }
             }
@@ -155,9 +162,9 @@ struct PublicationsVue: View {
             }
             Spacer()
             switch etatCompte {
-            case "connecte": Pastille(texte: "connecté", couleur: .vert)
-            case "a_reconnecter": Pastille(texte: "à reconnecter", couleur: .rouge)
-            default: Pastille(texte: "pas connecté", couleur: .texte2)
+            case "connecte": Pastille(texte: L("connecté"), couleur: .vert)
+            case "a_reconnecter": Pastille(texte: L("à reconnecter"), couleur: .rouge)
+            default: Pastille(texte: L("pas connecté"), couleur: .texte2)
             }
             if enCours.contains(c.id) {
                 ProgressView().controlSize(.small)
@@ -176,7 +183,7 @@ struct PublicationsVue: View {
         Task {
             let r = await Self.outil(["publication", "connecter", c.id])
             enCours.remove(c.id)
-            if r.code == 0 { message = "\(c.nom) : connecté." } else { erreur = Self.raison(r) }
+            if r.code == 0 { message = L("\(c.nom) : connecté.") } else { erreur = Self.raison(r) }
             charger()
         }
     }
@@ -184,13 +191,13 @@ struct PublicationsVue: View {
     // MARK: À valider (proposées par une session)
 
     private var carteAValider: some View {
-        Carte(titre: "À valider", detail: "proposées par une session : rien ne part sans votre clic") {
+        Carte(titre: L("À valider"), detail: L("proposées par une session : rien ne part sans votre clic")) {
             ForEach(aValider) { p in
                 LigneCarte(dernier: p.id == aValider.last?.id) {
                     VStack(alignment: .leading, spacing: 6) {
                         enTetePublication(p)
                         if !p.titre.isEmpty { Text("Titre : \(p.titre)").font(.ligne).foregroundStyle(Color.texte) }
-                        Text(p.texte.isEmpty ? "(texte vide)" : p.texte).font(.ligne).foregroundStyle(Color.texte)
+                        Text(p.texte.isEmpty ? L("(texte vide)") : p.texte).font(.ligne).foregroundStyle(Color.texte)
                             .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                         if p.ia { Text("Contenu réaliste généré ou modifié par IA : signalé à YouTube").font(.petit).foregroundStyle(Color.texte2) }
                         if !p.plugkit.isEmpty {
@@ -198,7 +205,7 @@ struct PublicationsVue: View {
                                 .font(.petit).foregroundStyle(Color.texte2)
                         }
                         HStack(spacing: 10) {
-                            BoutonPrincipal(titre: "Valider et programmer", symbole: "checkmark") { valider(p) }
+                            BoutonPrincipal(titre: L("Valider et programmer"), symbole: "checkmark") { valider(p) }
                             Button("Voir la vidéo") { etat.apercu = p.fichier }
                             Button("Refuser") { annuler(p) }
                             Spacer()
@@ -214,7 +221,7 @@ struct PublicationsVue: View {
         do {
             try Publications.valider(stock, id: p.id, empreinte: p.empreinte, par: "\(Moi.nom) (app)")
             Publications.reveillerAgent()
-            message = "Validée : \(ComptePublication.trouver(p.compte)?.nom ?? p.compte), \(Publications.heureParis(p.prevuLe))."
+            message = L("Validée : \(ComptePublication.trouver(p.compte)?.nom ?? p.compte), \(Publications.heureAffichee(p.prevuLe)).")
             erreur = nil
         } catch { erreur = "\(error)" }
         charger()
@@ -223,7 +230,7 @@ struct PublicationsVue: View {
     // MARK: Programmer
 
     private var carteProgrammer: some View {
-        Carte(titre: "Programmer une vidéo", detail: "vous validez ce texte et cette vidéo en cliquant") {
+        Carte(titre: L("Programmer une vidéo"), detail: L("vous validez ce texte et cette vidéo en cliquant")) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Button(fichier == nil ? "Choisir la vidéo…" : "Changer de vidéo…") { choisirFichier() }
@@ -275,12 +282,18 @@ struct PublicationsVue: View {
                 }
                 ForEach(refus, id: \.self) { r in Text(r).font(.secondaire).foregroundStyle(Color.rouge).fixedSize(horizontal: false, vertical: true) }
                 ForEach(avertissements, id: \.self) { a in Text(a).font(.secondaire).foregroundStyle(Color.ambre).fixedSize(horizontal: false, vertical: true) }
-                HStack {
-                    BoutonPrincipal(titre: "Programmer la publication", symbole: "calendar.badge.plus") { programmer() }
-                        .disabled(fichier == nil || choisis.isEmpty)
+                HStack(spacing: 10) {
+                    BoutonPrincipal(titre: L("Programmer la publication"), symbole: "calendar.badge.plus") { programmer() }
+                        .disabled(fichier == nil || choisis.isEmpty || preparation)
+                    if preparation {
+                        ProgressView().controlSize(.small)
+                        Text("Préparation de la vidéo… (jusqu'à 1 min par réseau)").font(.petit).foregroundStyle(Color.texte2)
+                    }
                     Spacer()
                 }
             }
+            // Pendant la préparation, le formulaire ne bouge plus : c'est lui qui sera vidé une fois la vidéo programmée.
+            .disabled(preparation)
             .padding(.horizontal, 16).padding(.bottom, 14)
         }
     }
@@ -332,10 +345,10 @@ struct PublicationsVue: View {
 
     private var noteCouverture: String {
         var l: [String] = []
-        if avecYouTube { l.append("YouTube : miniature posée une fois la vidéo traitée (l'image, sinon celle de la vidéo à l'instant choisi).") }
-        if avecInstagram { l.append(avecInstant ? "Instagram : l'image de la vidéo à l'instant choisi." : "Instagram : cochez un instant de la vidéo (l'API ne prend pas d'image), sinon la 1re image.") }
-        if avecTikTok { l.append("TikTok : à choisir dans l'app TikTok en publiant le brouillon.") }
-        return l.isEmpty ? "Choisissez d'abord les comptes." : l.joined(separator: " ")
+        if avecYouTube { l.append(L("YouTube : miniature posée une fois la vidéo traitée (l'image, sinon celle de la vidéo à l'instant choisi).")) }
+        if avecInstagram { l.append(avecInstant ? L("Instagram : l'image de la vidéo à l'instant choisi.") : L("Instagram : cochez un instant de la vidéo (l'API ne prend pas d'image), sinon la 1re image.")) }
+        if avecTikTok { l.append(L("TikTok : à choisir dans l'app TikTok en publiant le brouillon.")) }
+        return l.isEmpty ? L("Choisissez d'abord les comptes.") : l.joined(separator: " ")
     }
 
     private func choisirCouverture() {
@@ -343,18 +356,21 @@ struct PublicationsVue: View {
         p.allowedContentTypes = [.jpeg, .png]
         p.allowsMultipleSelection = false
         p.canChooseDirectories = false
-        p.message = "L'image de couverture (.jpg ou .png, verticale 1080 × 1920 de préférence)"
+        p.message = L("L'image de couverture (.jpg ou .png, verticale 1080 × 1920 de préférence)")
         if p.runModal() == .OK, let u = p.url { couverture = u }
     }
 
     private var libelleTexte: String {
         var l: [String] = []
-        if avecYouTube { l.append("description YouTube") }
-        if avecInstagram { l.append("légende Instagram") }
-        if avecTikTok { l.append("légende TikTok (à coller dans l'app)") }
-        guard !l.isEmpty else { return "Texte" }
+        if avecYouTube { l.append(L("description YouTube")) }
+        if avecInstagram { l.append(L("légende Instagram")) }
+        if avecTikTok { l.append(L("légende TikTok (à coller dans l'app)")) }
+        guard !l.isEmpty else { return L("Texte") }
         let t = l.joined(separator: ", ")
-        return t.prefix(1).uppercased() + t.dropFirst() + (avecInstagram || avecTikTok ? " (\(texte.count)/2 200)" : "")
+        let titre = t.prefix(1).uppercased() + t.dropFirst()
+        // Pas de L() : la clé ne serait que « %@ (%lld/%lld) », sans mot. Les nombres suivent la langue (2 200 / 2,200 / 2200).
+        let compte = texte.count.formatted(.number.locale(Loc.locale)), plafond = 2200.formatted(.number.locale(Loc.locale))
+        return avecInstagram || avecTikTok ? "\(titre) (\(compte)/\(plafond))" : titre
     }
 
     private func choisirFichier() {
@@ -362,44 +378,57 @@ struct PublicationsVue: View {
         p.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
         p.allowsMultipleSelection = false
         p.canChooseDirectories = false
-        p.message = "La vidéo à publier (verticale, .mp4 ou .mov)"
+        p.message = L("La vidéo à publier (verticale, .mp4 ou .mov)")
         if p.runModal() == .OK, let u = p.url { fichier = u }
     }
 
+    /// La préparation (empreinte, copies Instagram et TikTok ré-encodées : jusqu'à 1 min par réseau) tourne hors du fil
+    /// principal, sur sa propre connexion à la base : l'app reste utilisable pendant ce temps.
     private func programmer() {
-        guard let stock = etat.stock, let fichier else { return }
+        guard let stock = etat.stock, let fichier, !preparation else { return }
         refus = []
         avertissements = []
         erreur = nil
-        do {
-            let r = try Publications.programmer(stock, DemandePublication(comptes: ComptePublication.tous.map(\.id).filter(choisis.contains),
-                                                                          fichier: fichier.path, titre: titre, texte: texte, prevuLe: le,
-                                                                          ia: ia, par: "\(Moi.nom) (app)", couverture: couverture?.path ?? "",
-                                                                          couvertureA: avecInstant ? instant : nil), validee: true)
-            Publications.reveillerAgent()
-            avertissements = r.avertissements
-            message = "Programmée : \(r.publications.map { ComptePublication.trouver($0.compte)?.nom ?? $0.compte }.joined(separator: ", ")), \(Publications.heureParis(le))."
-            self.fichier = nil
-            titre = ""
-            texte = ""
-            ia = false
-            choisis = []
-            couverture = nil
-            avecInstant = false
-        } catch let e as RefusPublication {
-            refus = e.raisons
-        } catch {
-            erreur = "\(error)"
+        let quand = le
+        let demande = DemandePublication(comptes: ComptePublication.tous.map(\.id).filter(choisis.contains),
+                                         fichier: fichier.path, titre: titre, texte: texte, prevuLe: quand,
+                                         ia: ia, par: "\(Moi.nom) (app)", couverture: couverture?.path ?? "",
+                                         couvertureA: avecInstant ? instant : nil)
+        let chemin = stock.base.chemin
+        preparation = true
+        Task {
+            let resultat = await Task.detached(priority: .userInitiated) { () -> Result<Publications.Programmees, Error> in
+                Result { try Publications.programmer(Stockage(base: try Base(chemin: chemin)), demande, validee: true) }
+            }.value
+            preparation = false
+            switch resultat {
+            case .success(let r):
+                Publications.reveillerAgent()
+                avertissements = r.avertissements
+                let noms = r.publications.map { ComptePublication.trouver($0.compte)?.nom ?? $0.compte }.joined(separator: ", ")
+                message = L("Programmée : \(noms), \(Publications.heureAffichee(quand)).")
+                self.fichier = nil
+                titre = ""
+                texte = ""
+                ia = false
+                choisis = []
+                couverture = nil
+                avecInstant = false
+            case .failure(let e as RefusPublication):
+                refus = e.raisons
+            case .failure(let e):
+                erreur = "\(e)"
+            }
+            charger()
         }
-        charger()
     }
 
     // MARK: Programmées et terminées
 
     private var carteActives: some View {
-        Carte(titre: "Programmées", detail: actives.isEmpty ? nil : "\(actives.count) à venir") {
+        Carte(titre: L("Programmées"), detail: actives.isEmpty ? nil : L("\(actives.count) à venir")) {
             if actives.isEmpty {
-                EtatVide(texte: "Aucune publication à venir.")
+                EtatVide(texte: L("Aucune publication à venir."))
             } else {
                 ForEach(actives) { p in
                     LigneCarte(dernier: p.id == actives.last?.id) {
@@ -413,7 +442,7 @@ struct PublicationsVue: View {
                                     Button("Copier la légende") {
                                         NSPasteboard.general.clearContents()
                                         NSPasteboard.general.setString(p.texte, forType: .string)
-                                        message = "Légende TikTok copiée : collez-la dans l'app TikTok (la couverture s'y choisit aussi)."
+                                        message = L("Légende TikTok copiée : collez-la dans l'app TikTok (la couverture s'y choisit aussi).")
                                     }.buttonStyle(.link)
                                 }
                                 if p.etat != "envoi" {
@@ -431,7 +460,7 @@ struct PublicationsVue: View {
     }
 
     private var carteTerminees: some View {
-        Carte(titre: "Terminées", detail: "30 derniers jours") {
+        Carte(titre: L("Terminées"), detail: L("30 derniers jours")) {
             ForEach(terminees) { p in
                 LigneCarte(dernier: p.id == terminees.last?.id) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -451,8 +480,8 @@ struct PublicationsVue: View {
     private func enTetePublication(_ p: Publication) -> some View {
         HStack(spacing: 8) {
             Text(ComptePublication.trouver(p.compte)?.nom ?? p.compte).font(.ligneForte).foregroundStyle(Color.texte)
-            Text(Publications.heureParis(p.prevuLe)).font(.secondaire).foregroundStyle(Color.texte2)
-            Text("« \(Publications.apercu(p)) »").font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
+            Text(Publications.heureAffichee(p.prevuLe)).font(.secondaire).foregroundStyle(Color.texte2)
+            Text(Publications.entreGuillemets(Publications.apercu(p))).font(.secondaire).foregroundStyle(Color.texte2).lineLimit(1)
             Spacer()
             Pastille(texte: libelle(p), couleur: couleur(p))
         }
@@ -460,19 +489,19 @@ struct PublicationsVue: View {
 
     private func libelle(_ p: Publication) -> String {
         switch p.etat {
-        case "a_valider": return "à valider"
-        case "planifie": return "prévue"
-        case "envoi": return "envoi en cours"
+        case "a_valider": return L("à valider")
+        case "planifie": return L("prévue")
+        case "envoi": return L("envoi en cours")
         case "envoye":
             switch p.reseau {
-            case .youtube: return "chez YouTube"
-            case .instagram: return "prête chez Instagram"
-            case .tiktok: return p.phase == "boite" ? "brouillon TikTok à publier" : "chez TikTok"
+            case .youtube: return L("chez YouTube")
+            case .instagram: return L("prête chez Instagram")
+            case .tiktok: return p.phase == "boite" ? L("brouillon TikTok à publier") : L("chez TikTok")
             }
-        case "publie": return "publiée"
-        case "echec": return "pas publiée"
-        case "reconnexion": return "compte à reconnecter"
-        case "annule": return "annulée"
+        case "publie": return L("publiée")
+        case "echec": return L("pas publiée")
+        case "reconnexion": return L("compte à reconnecter")
+        case "annule": return L("annulée")
         default: return p.etat
         }
     }
@@ -494,7 +523,7 @@ struct PublicationsVue: View {
         Task {
             let r = await Self.outil(["publication", "annuler", p.id, "--par", "\(Moi.nom) (app)"])
             enCours.remove(p.id)
-            if r.code != 0 { erreur = Self.raison(r) } else { message = "Annulée." }
+            if r.code != 0 { erreur = Self.raison(r) } else { message = L("Annulée.") }
             charger()
         }
     }
@@ -508,7 +537,7 @@ struct PublicationsVue: View {
     static func raison(_ r: (code: Int32, sortie: String, erreur: String)) -> String {
         let e = r.erreur.trimmingCharacters(in: .whitespacesAndNewlines)
         let lignes = e.split(separator: "\n").filter { !$0.hasPrefix("Page Google ouverte") }
-        return lignes.last.map(String.init) ?? "L'outil n'a pas répondu (code \(r.code))."
+        return lignes.last.map(String.init) ?? L("L'outil n'a pas répondu (code \(Int(r.code))).")
     }
 }
 
@@ -523,10 +552,10 @@ struct FeuilleJetonInstagram: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Connecter \(compte.nom)").font(.titreSection).foregroundStyle(Color.texte)
             VStack(alignment: .leading, spacing: 8) {
-                etape(1, "Sur instagram.com, connecté en @\(compte.poignee) : Paramètres › Autorisations du site Web › Applications et sites Web › Invitations à tester : acceptez « Pilote publication ».")
-                etape(2, "developers.facebook.com › « Pilote publication » › Cas d'utilisation › Instagram › Personnaliser › Configuration de l'API avec connexion unifiée › Générer des tokens d'accès.")
-                etape(3, "Sur la ligne @\(compte.poignee) : « Générer un token », cochez le compte @\(compte.poignee) à partager, puis « Copier ».")
-                etape(4, "Revenez ici et cliquez « Coller le jeton copié » (ou directement, si PILOTE l'a rangé dans le trousseau). Le presse-papiers est vidé.")
+                etape(1, L("Sur instagram.com, connecté en @\(compte.poignee) : Paramètres › Autorisations du site Web › Applications et sites Web › Invitations à tester : acceptez « Pilote publication »."))
+                etape(2, L("developers.facebook.com › « Pilote publication » › Cas d'utilisation › Instagram › Personnaliser › Configuration de l'API avec connexion unifiée › Générer des tokens d'accès."))
+                etape(3, L("Sur la ligne @\(compte.poignee) : « Générer un token », cochez le compte @\(compte.poignee) à partager, puis « Copier »."))
+                etape(4, L("Revenez ici et cliquez « Coller le jeton copié » (ou directement, si PILOTE l'a rangé dans le trousseau). Le presse-papiers est vidé."))
             }
             Button("Ouvrir le tableau de bord Meta") { NSWorkspace.shared.open(URL(string: "https://developers.facebook.com/apps/")!) }
                 .buttonStyle(.link)
@@ -535,7 +564,7 @@ struct FeuilleJetonInstagram: View {
                 Button("Fermer") { fini(nil) }
                 Spacer()
                 if enCours { ProgressView().controlSize(.small) }
-                BoutonPrincipal(titre: "Coller le jeton copié", symbole: "doc.on.clipboard") { coller() }.disabled(enCours)
+                BoutonPrincipal(titre: L("Coller le jeton copié"), symbole: "doc.on.clipboard") { coller() }.disabled(enCours)
             }
         }
         .padding(24)
@@ -555,7 +584,7 @@ struct FeuilleJetonInstagram: View {
         Task {
             let r = await PublicationsVue.outil(["publication", "connecter", compte.id])
             enCours = false
-            if r.code == 0 { fini("\(compte.nom) : connecté.") } else { erreur = PublicationsVue.raison(r) }
+            if r.code == 0 { fini(L("\(compte.nom) : connecté.")) } else { erreur = PublicationsVue.raison(r) }
         }
     }
 }

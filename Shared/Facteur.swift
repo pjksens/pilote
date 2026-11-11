@@ -94,19 +94,27 @@ enum Facteur {
     }
 
     /// « reçu par X à 22:01 », « en route vers X », « part par la veille vers 22:15 »…
+    /// 10/11 (langues) : le texte s'affiche à l'écran (traduit) ; la consigne et la ligne JSON, elles, restent en français.
     static func libelle(_ r: Remise?, pour: String, veille: Date?) -> (texte: String, fait: Bool) {
-        let h = { (d: Date?) in d.map { $0.formatted(date: .omitted, time: .shortened) } ?? "" }
+        let f = DateFormatter()
+        f.locale = Loc.locale
+        f.dateFormat = "HH:mm"
+        let h = { (d: Date?) in d.map { f.string(from: $0) } ?? "" }
+        func partParLaVeille() -> String {
+            veille.map { L("part à \(pour) par la veille vers \(h($0))") } ?? L("part à \(pour) par la veille")
+        }
         switch r?.etat {
-        case .retire?: return ("pas envoyé", false)
+        case .retire?: return (L("pas envoyé"), false)
         case .pret?:
-            if actif() { return ("en route vers \(pour)", false) }
-            return (veille.map { "part à \(pour) par la veille vers \(h($0))" } ?? "attend le Facteur pour \(pour)", false)
-        case .remis?: return ("reçu par \(pour) à \(h(r?.le))" + (r?.par == "veille" ? " (veille)" : ""), true)
-        case .emis?: return ("en route vers \(pour)", false)
-        case .echec?: return ("pas remis à \(pour) : \(r?.raison ?? "")", false)
+            if actif() { return (L("en route vers \(pour)"), false) }
+            return (partParLaVeille(), false)
+        case .remis?:
+            return (r?.par == "veille" ? L("reçu par \(pour) à \(h(r?.le)) (veille)") : L("reçu par \(pour) à \(h(r?.le))"), true)
+        case .emis?: return (L("en route vers \(pour)"), false)
+        case .echec?: return (L("pas remis à \(pour) : \(r?.raison ?? "")"), false)
         case nil:
-            if actif() { return ("en route vers \(pour)", false) }
-            return (veille.map { "part à \(pour) par la veille vers \(h($0))" } ?? "attend le Facteur pour \(pour)", false)
+            if actif() { return (L("en route vers \(pour)"), false) }
+            return (partParLaVeille(), false)
         }
     }
 

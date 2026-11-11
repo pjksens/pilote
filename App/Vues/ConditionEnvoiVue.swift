@@ -52,7 +52,7 @@ struct ConditionEnvoi: View {
         let ref = Libelles.refRappel(evenement.rappelId)
         let t = agenda.taches.first { $0.id == ref || $0.titre == ref }
         let titre = t?.titre ?? ref
-        if let t { return "Rappel lié : « \(titre) », \(t.faite ? "coché" : "à faire")" }
-        return evenement.rappelFermeLe.isEmpty ? "Rappel lié : « \(titre) »" : "Rappel lié : « \(titre) », traité par Pilote"
+        if let t { return t.faite ? L("Rappel lié : « \(titre) », coché") : L("Rappel lié : « \(titre) », à faire") }
+        return evenement.rappelFermeLe.isEmpty ? L("Rappel lié : « \(titre) »") : L("Rappel lié : « \(titre) », traité par Pilote")
     }
 }

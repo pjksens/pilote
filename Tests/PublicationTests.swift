@@ -75,6 +75,8 @@ final class PublicationTests: XCTestCase {
     static var videos: [String: URL] = [:]
 
     override func setUpWithError() throws {
+        // Les vidéos d'essai sont petites (360×640) : le garde-fou 4K a son propre test.
+        Publications.definitionMinimale = (0, 0)
         chemin = FileManager.default.temporaryDirectory.appendingPathComponent("pilote-pub-\(UUID().uuidString).sqlite")
         dossier = FileManager.default.temporaryDirectory.appendingPathComponent("pilote-pub-\(UUID().uuidString)", isDirectory: true)
         s = Stockage(base: try Base(chemin: chemin))
@@ -88,20 +90,21 @@ final class PublicationTests: XCTestCase {
     }
 
     override func tearDown() {
+        Publications.definitionMinimale = (2160, 3840)
         for suffixe in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: chemin.path + suffixe) }
         try? FileManager.default.removeItem(at: dossier)
     }
 
     /// Une petite vidéo réelle (ffmpeg), faite une fois par lancement.
-    func video(_ nom: String, largeur: Int = 360, hauteur: Int = 640, duree: Int = 4) throws -> URL {
-        let cle = "\(nom)-\(largeur)x\(hauteur)-\(duree)"
+    func video(_ nom: String, largeur: Int = 360, hauteur: Int = 640, duree: Int = 4, fps: Int = 30, codec: String = "libx264") throws -> URL {
+        let cle = "\(nom)-\(largeur)x\(hauteur)-\(duree)-\(fps)-\(codec)"
         if let u = Self.videos[cle], FileManager.default.fileExists(atPath: u.path) { return u }
         let ffmpeg = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"].first { FileManager.default.isExecutableFile(atPath: $0) }
         guard let ffmpeg else { throw XCTSkip("ffmpeg absent : pas de vidéo d'essai") }
         let u = FileManager.default.temporaryDirectory.appendingPathComponent("pilote-pub-\(cle).mp4")
         try? FileManager.default.removeItem(at: u)
-        let r = FileEnvoi.lancer(ffmpeg, ["-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=\(largeur)x\(hauteur):rate=10:duration=\(duree)",
-                                          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-metadata", "comment=\(nom)", "-y", u.path])
+        let r = FileEnvoi.lancer(ffmpeg, ["-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=\(largeur)x\(hauteur):rate=\(fps):duration=\(duree)",
+                                          "-c:v", codec, "-pix_fmt", "yuv420p", "-metadata", "comment=\(nom)", "-y", u.path])
         XCTAssertEqual(r.code, 0, r.erreur)
         Self.videos[cle] = u
         return u
@@ -168,13 +171,31 @@ final class PublicationTests: XCTestCase {
         XCTAssertTrue(r.avertissements.joined().contains("pas verticale"))
     }
 
+    /// Règle de Sacha : jamais sous la 4K. Refusée à la programmation, rien n'est copié ni écrit en base.
+    func testSousLa4KRefuseeALaProgrammation() throws {
+        Publications.definitionMinimale = (2160, 3840)
+        typealias I = Publications.InfosVideo
+        XCTAssertNil(Publications.refusSous4K(I(duree: 10, largeur: 2160, hauteur: 3840)))
+        XCTAssertNil(Publications.refusSous4K(I(duree: 10, largeur: 3840, hauteur: 2160)))   // 4K couchée
+        XCTAssertNotNil(Publications.refusSous4K(I(duree: 10, largeur: 1080, hauteur: 1920)))
+        XCTAssertNotNil(Publications.refusSous4K(I(duree: 10, largeur: 2160, hauteur: 3000)))
+        let raisons = refus { try programmer(["yt-perso", "ig-kryva"]) }
+        XCTAssertTrue(raisons.joined().contains("vidéo en 360×640 : sous la 4K (2160×3840)"), "\(raisons)")
+        XCTAssertEqual(raisons.filter { $0.contains("sous la 4K") }.count, 1, "une seule fois, pas une par compte")
+        XCTAssertTrue(try Publications.liste(s, maintenant: t0).isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dossier.path), "rien de copié")
+    }
+
     func testUneLigneParCompteEtCopieValidee() throws {
         let l = try programmer(["yt-perso", "ig-kryva"], titre: "Titre", texte: "Légende")
         XCTAssertEqual(l.count, 2)
         XCTAssertEqual(l.map(\.etat), ["planifie", "planifie"])
-        XCTAssertEqual(l[0].fichier, l[1].fichier)
-        XCTAssertTrue(l[0].fichier.hasPrefix(dossier.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: l[0].fichier))
+        // YouTube : la vidéo telle quelle ; Instagram : sa copie (CopieReseau), toutes deux dans le dossier de Pilote.
+        XCTAssertTrue(try XCTUnwrap(l.first { $0.compte == "ig-kryva" }).fichier.hasSuffix("-ig1.mp4"))
+        for x in l {
+            XCTAssertTrue(x.fichier.hasPrefix(dossier.path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: x.fichier))
+        }
         XCTAssertEqual(l.first { $0.compte == "ig-kryva" }?.titre, "", "Instagram n'a pas de titre")
         XCTAssertEqual(l.first { $0.compte == "yt-perso" }?.titre, "Titre")
     }
@@ -275,22 +296,26 @@ final class PublicationTests: XCTestCase {
     func testCopieEffaceeDesQueYouTubeLaTientSaufSiUneAutreCarteEnABesoin() throws {
         func existe(_ f: String) -> Bool { FileManager.default.fileExists(atPath: f) }
         func etat(_ id: String, _ e: String) throws { try s.base.executer("UPDATE publications SET etat = ?, ref = 'r1' WHERE id = ?", [e, id]) }
-        let l = try programmer(["yt-perso", "ig-kryva"], dans: 3600)
+        let l = try programmer(["yt-perso", "ig-kryva", "ig-perso"], dans: 3600)
         let yt = try XCTUnwrap(l.first { $0.compte == "yt-perso" }), ig = try XCTUnwrap(l.first { $0.compte == "ig-kryva" })
-        XCTAssertEqual(yt.fichier, ig.fichier, "une seule copie pour les deux cartes")
+        let ig2 = try XCTUnwrap(l.first { $0.compte == "ig-perso" })
+        XCTAssertNotEqual(yt.fichier, ig.fichier, "Instagram a sa copie (CopieReseau), YouTube la vidéo telle quelle")
+        XCTAssertEqual(ig.fichier, ig2.fichier, "une seule copie pour les deux comptes Instagram")
         let vignette = try XCTUnwrap(Publications.vignette(yt))
-        // YouTube envoyée, Instagram encore à faire : la copie reste.
+        // YouTube envoyée : sa copie part ; celle d'Instagram, encore à faire, reste.
         try etat(yt.id, "envoye")
         try Publications.nettoyerCopies(s, maintenant: t0)
-        XCTAssertTrue(existe(yt.fichier), "Instagram « planifie » relit encore la copie")
-        // Instagram « envoye » (conteneur prêt, pas publié) : la copie reste encore.
+        XCTAssertFalse(existe(yt.fichier), "YouTube « envoye » : la vidéo est chez YouTube, la copie part")
+        XCTAssertTrue(existe(ig.fichier), "Instagram « planifie » relit encore la copie")
+        // Un compte Instagram publié, l'autre « envoye » (conteneur prêt, pas publié) : la copie reste encore.
+        try etat(ig2.id, "publie")
         try etat(ig.id, "envoye")
         try Publications.nettoyerCopies(s, maintenant: t0)
-        XCTAssertTrue(existe(yt.fichier), "Instagram « envoye » n'est pas fini")
-        // Instagram publiée : seule reste YouTube « envoye », qui n'en a plus besoin.
+        XCTAssertTrue(existe(ig.fichier), "Instagram « envoye » n'est pas fini")
+        // Les deux publiées : la copie Instagram part.
         try etat(ig.id, "publie")
         try Publications.nettoyerCopies(s, maintenant: t0)
-        XCTAssertFalse(existe(yt.fichier), "YouTube « envoye » : la vidéo est chez YouTube, la copie part")
+        XCTAssertFalse(existe(ig.fichier))
         XCTAssertEqual(Publications.vignette(yt), vignette, "la vignette du planning reste")
         // La règle, carte par carte.
         let lim = Dates.iso.string(from: t0.addingTimeInterval(-7 * 86400)), recent = Dates.iso.string(from: t0)
@@ -588,10 +613,14 @@ final class PublicationTests: XCTestCase {
 
     func testInstagramConteneurAvantPuisPublieALHeure() throws {
         let x = try XCTUnwrap(programmer(["ig-perso"], dans: 3600, texte: "Légende exacte").first)
+        // Essai dès la validation : le conteneur vit jusqu'à l'heure (moins de 23 h), il est gardé.
         try passe(a: t0.addingTimeInterval(60))
-        XCTAssertTrue(reseau.preparees.isEmpty, "rien avant 20 min de l'heure")
-        try passe(a: t0.addingTimeInterval(3600 - 19 * 60))
         XCTAssertEqual(reseau.preparees.first?.texte, "Légende exacte")
+        XCTAssertEqual(try p(x.id).etat, "envoye")
+        XCTAssertFalse(try p(x.id).verifieLe.isEmpty)
+        XCTAssertTrue(reseau.publiees.isEmpty, "jamais publiée avant l'heure")
+        try passe(a: t0.addingTimeInterval(3600 - 19 * 60))
+        XCTAssertEqual(reseau.preparees.count, 1, "pas de deuxième envoi")
         XCTAssertEqual(try p(x.id).etat, "envoye")
         XCTAssertTrue(reseau.publiees.isEmpty, "jamais publiée avant l'heure")
         try passe(a: t0.addingTimeInterval(3600 - 60))
@@ -646,6 +675,137 @@ final class PublicationTests: XCTestCase {
         try passe(a: t0.addingTimeInterval(3600 + 10))
         XCTAssertEqual(try p(x.id).etat, "publie")
         XCTAssertTrue(reseau.publiees.isEmpty, "pas de deuxième media_publish")
+    }
+
+    // MARK: Instagram, essai dès la validation (10/11)
+
+    func testInstagramEssaiLoinDeLHeurePuisEnvoiDefinitif() throws {
+        let x = try XCTUnwrap(programmer(["ig-kryva"], dans: 2 * 86400).first)
+        try passe(a: t0.addingTimeInterval(60))
+        XCTAssertEqual(reseau.preparees.count, 1, "essai tout de suite")
+        var y = try p(x.id)
+        XCTAssertEqual(y.etat, "planifie")
+        XCTAssertEqual(y.conteneur, "", "conteneur pas gardé : il serait périmé à l'heure (24 h)")
+        XCTAssertFalse(y.verifieLe.isEmpty)
+        XCTAssertTrue(y.raison.contains("essai Instagram réussi"), y.raison)
+        try passe(a: t0.addingTimeInterval(3600))
+        XCTAssertEqual(reseau.preparees.count, 1, "un seul essai")
+        try passe(a: t0.addingTimeInterval(2 * 86400 - 19 * 60))
+        XCTAssertEqual(reseau.preparees.count, 2, "envoi définitif 20 min avant")
+        XCTAssertEqual(try p(x.id).etat, "envoye")
+        try passe(a: t0.addingTimeInterval(2 * 86400 + 20))
+        y = try p(x.id)
+        XCTAssertEqual(y.etat, "publie")
+        XCTAssertEqual(reseau.publiees, ["cont2"])
+    }
+
+    func testInstagramEssaiRefuseAlerteDesHeuresAvant() throws {
+        let x = try XCTUnwrap(programmer(["ig-perso"], dans: 86400).first)
+        reseau.erreurPreparation = [.definitive("Instagram : ProcessingFailedError")]
+        try passe(a: t0.addingTimeInterval(60))
+        XCTAssertEqual(try p(x.id).etat, "echec")
+        XCTAssertTrue(alertes.contains { $0.grave && $0.texte.contains("ProcessingFailedError") })
+        XCTAssertTrue(reseau.publiees.isEmpty)
+    }
+
+    func testInstagramEssaiRateParLeReseauSansEchec() throws {
+        let x = try XCTUnwrap(programmer(["ig-perso"], dans: 2 * 86400).first)
+        reseau.erreurPreparation = Array(repeating: .passagere("réseau coupé"), count: Publications.tentativesMax)
+        for i in 1...Publications.tentativesMax { try passe(a: t0.addingTimeInterval(Double(i) * 3600)) }
+        let y = try p(x.id)
+        XCTAssertEqual(y.etat, "planifie", "la vidéo n'est pas en cause : pas d'échec")
+        XCTAssertFalse(y.verifieLe.isEmpty)
+        XCTAssertTrue(y.raison.contains("essai Instagram impossible"), y.raison)
+        XCTAssertTrue(alertes.contains { $0.grave && $0.titre.contains("essai Instagram") })
+        try passe(a: t0.addingTimeInterval(10 * 3600))
+        XCTAssertTrue(reseau.preparees.isEmpty, "plus d'essai")
+        try passe(a: t0.addingTimeInterval(2 * 86400 - 19 * 60))
+        XCTAssertEqual(try p(x.id).etat, "envoye", "envoi 20 min avant, comme avant")
+    }
+
+    func testInstagramEssaiAttendQuandUnePublicationArrive() throws {
+        try programmer(["ig-perso"], dans: 20 * 60, fichier: try video("proche"))
+        let x = try XCTUnwrap(programmer(["ig-kryva"], dans: 86400).first)
+        try passe(a: t0.addingTimeInterval(60))
+        XCTAssertEqual(try p(x.id).verifieLe, "", "pas d'essai : une autre publication arrive dans les 35 min")
+        try passe(a: t0.addingTimeInterval(3600))
+        XCTAssertFalse(try p(x.id).verifieLe.isEmpty)
+    }
+
+    func testInstagramEssaiEnCoursRelu() throws {
+        final class Faux4: FauxReseau {
+            override func instagramPreparer(_ p: Publication, fichier: URL) throws -> String {
+                let c = try super.instagramPreparer(p, fichier: fichier)
+                conteneurs[c] = ConteneurInstagram(code: "IN_PROGRESS", detail: "")
+                return c
+            }
+        }
+        reseau = Faux4()
+        let x = try XCTUnwrap(programmer(["ig-perso"], dans: 2 * 86400).first)
+        try passe(a: t0.addingTimeInterval(60))
+        XCTAssertEqual(try p(x.id).conteneur, "cont1")
+        XCTAssertEqual(try p(x.id).verifieLe, "")
+        reseau.conteneurs["cont1"] = ConteneurInstagram(code: "ERROR", detail: "format")
+        try passe(a: t0.addingTimeInterval(120))
+        XCTAssertEqual(try p(x.id).etat, "echec")
+        XCTAssertTrue(alertes.contains { $0.grave && $0.texte.contains("à l'essai") })
+    }
+
+    // MARK: Copie par réseau (10/11)
+
+    func testCopieReseauLecture() throws {
+        XCTAssertEqual(try XCTUnwrap(CopieReseau.fps("30000/1001")), 29.97, accuracy: 0.01)
+        XCTAssertNil(CopieReseau.fps("0/0"))
+        let json = """
+        {"streams":[{"codec_type":"video","codec_name":"hevc","pix_fmt":"yuv420p10le","width":2160,"height":3840,"avg_frame_rate":"60/1"},
+                    {"codec_type":"audio","codec_name":"aac","bit_rate":"128000"}],
+         "format":{"duration":"36.5","bit_rate":"268128000"}}
+        """
+        let s = try XCTUnwrap(CopieReseau.lire(json))
+        XCTAssertEqual(s.debitVideo, 268_000_000, "débit vidéo = total moins le son")
+        XCTAssertEqual(s.fps, 60)
+        XCTAssertFalse(CopieReseau.conforme(s, CopieReseau.instagram))
+        XCTAssertLessThanOrEqual(CopieReseau.tailleEstimee(s, CopieReseau.instagram, tailleSource: 1_200_000_000), 120_000_000)
+        XCTAssertTrue(CopieReseau.refus(s, reseau: .instagram).isEmpty)
+        var lent = s; lent.fps = 15
+        XCTAssertTrue(CopieReseau.refus(lent, reseau: .tiktok).joined().contains("images/s"))
+        XCTAssertTrue(CopieReseau.refus(lent, reseau: .youtube).isEmpty)
+        let a = CopieReseau.arguments(source: URL(fileURLWithPath: "/a.mov"), sortie: URL(fileURLWithPath: "/b.mp4"),
+                                      profil: CopieReseau.instagram, reencoder: true)
+        for x in ["h264_videotoolbox", "20000000", "24000000", "yuv420p", "+faststart"] { XCTAssertTrue(a.contains(x), x) }
+        for x in ["-s", "-r", "-vf", "scale"] { XCTAssertFalse(a.contains(x), "taille et images/s jamais changées : \(x)") }
+        XCTAssertTrue(CopieReseau.arguments(source: URL(fileURLWithPath: "/a.mp4"), sortie: URL(fileURLWithPath: "/b.mp4"),
+                                            profil: CopieReseau.tiktok, reencoder: false).contains("copy"))
+    }
+
+    func testProgrammerPrepareUneCopieParReseau() throws {
+        let hevc = try video("hevc", codec: "hevc_videotoolbox")
+        let liste = try programmer(["yt-perso", "ig-perso", "tt-perso"], fichier: hevc)
+        let yt = try XCTUnwrap(liste.first { $0.compte == "yt-perso" })
+        let ig = try XCTUnwrap(liste.first { $0.compte == "ig-perso" })
+        let tt = try XCTUnwrap(liste.first { $0.compte == "tt-perso" })
+        XCTAssertEqual(CopieReseau.sonder(URL(fileURLWithPath: yt.fichier))?.codec, "hevc", "YouTube reçoit la vidéo telle quelle")
+        for (x, suffixe) in [(ig, "-ig1.mp4"), (tt, "-tt1.mp4")] {
+            XCTAssertTrue(x.fichier.hasSuffix(suffixe), x.fichier)
+            let c = try XCTUnwrap(CopieReseau.sonder(URL(fileURLWithPath: x.fichier)))
+            XCTAssertEqual(c.codec, "h264")
+            XCTAssertEqual([c.largeur, c.hauteur], [360, 640], "taille d'image gardée")
+            XCTAssertEqual(c.fps, 30, accuracy: 0.5, "images/s gardées")
+            XCTAssertEqual(x.empreinteFichier, try Publications.empreinteFichier(URL(fileURLWithPath: x.fichier)), "l'empreinte porte sur la copie")
+        }
+        XCTAssertNotEqual(ig.empreinteFichier, yt.empreinteFichier)
+        // La même vidéo reprogrammée : reconnue malgré la copie.
+        XCTAssertFalse(refus { try programmer(["ig-perso"], fichier: hevc) }.isEmpty)
+        // La passe relit bien la copie validée (empreinte).
+        try passe(a: t0.addingTimeInterval(3600 - 19 * 60))
+        XCTAssertEqual(try p(ig.id).etat, "envoye")
+    }
+
+    func testProgrammerRefuseLesImagesParSecondeHorsLimite() throws {
+        let lente = try video("lente", fps: 10)
+        XCTAssertTrue(refus { try programmer(["ig-perso"], fichier: lente) }.joined().contains("images/s"))
+        XCTAssertTrue(refus { try programmer(["tt-perso"], titre: "", fichier: lente) }.joined().contains("images/s"))
+        XCTAssertEqual(try programmer(["yt-perso"], fichier: lente).count, 1, "YouTube : pas de limite")
     }
 
     func testJetonQuiExpireSansRenouvellementAlerte() throws {
@@ -932,6 +1092,43 @@ final class PublicationTests: XCTestCase {
         XCTAssertNil(ConnexionPublication.jetonMeta("EA court"))
         XCTAssertTrue(PlateformesReelles.connexionUnifiee(ea), "connexion unifiée : graph.facebook.com")
         XCTAssertFalse(PlateformesReelles.connexionUnifiee(ig), "connexion Instagram : graph.instagram.com")
+    }
+
+    func testInstagramMorceaux() {
+        let m = PlateformesReelles.morceauInstagram
+        XCTAssertEqual(m, 8 * 1024 * 1024)
+        XCTAssertEqual(PlateformesReelles.morceaux(taille: 0, morceau: m), [])
+        XCTAssertEqual(PlateformesReelles.morceaux(taille: 1_000, morceau: m), [0..<1_000])
+        XCTAssertEqual(PlateformesReelles.morceaux(taille: 2 * m, morceau: m), [0..<m, m..<(2 * m)], "taille ronde : pas de morceau vide")
+        // Reel 4K de n°2 (70 Mo) : 9 morceaux, offsets croissants, le dernier plus court, tout le fichier couvert une fois.
+        let t = PlateformesReelles.morceaux(taille: 70_123_456, morceau: m)
+        XCTAssertEqual(t.count, 9)
+        XCTAssertEqual(t.first?.lowerBound, 0)
+        XCTAssertEqual(t.last?.upperBound, 70_123_456)
+        XCTAssertEqual(t.map(\.count).reduce(0, +), 70_123_456)
+        XCTAssertTrue(zip(t, t.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound })
+    }
+
+    func testTunnelVideoHote() {
+        let journal = """
+        2026-11-10T12:20:01Z INF Requesting new quick Tunnel on trycloudflare.com...
+        2026-11-10T12:20:03Z INF |  https://api.trycloudflare.com  |
+        2026-11-10T12:20:04Z INF |  https://petit-bleu-avion-feutre.trycloudflare.com  |
+        """
+        XCTAssertEqual(TunnelVideo.hoteTunnel(journal), "https://petit-bleu-avion-feutre.trycloudflare.com", "l'adresse de l'API est sautée")
+        XCTAssertNil(TunnelVideo.hoteTunnel("INF |  https://api.trycloudflare.com  |"))
+        XCTAssertNil(TunnelVideo.hoteTunnel("INF Requesting new quick Tunnel on trycloudflare.com..."))
+        XCTAssertEqual(TunnelVideo.valeur("PID", "PORT 51234\nPID 4242\nCF INF ..."), 4242)
+        XCTAssertNil(TunnelVideo.valeur("PID", "PORT 51234\nCF PID inconnu"))
+        XCTAssertEqual(TunnelVideo.dureeMax, 900, "garde-fou : 15 min au plus")
+    }
+
+    func testInstagramVoieSelonLongueur() {
+        let refus = ErreurPlateforme.definitive(#"envoi de la vidéo à Instagram (morceau 9/9) : HTTP 400, code 0 {"debug_info":{"retriable":false,"type":"ProcessingFailedError"}}"#)
+        XCTAssertTrue(PlateformesReelles.traitementTropLong(refus), "trop longue pour l'envoi direct : lien temporaire")
+        XCTAssertFalse(PlateformesReelles.traitementTropLong(ErreurPlateforme.definitive("création du conteneur : HTTP 400, code 100")))
+        XCTAssertFalse(PlateformesReelles.traitementTropLong(ErreurPlateforme.passagere("ProcessingFailedError")), "passagère : renvoyée telle quelle")
+        XCTAssertEqual(PlateformesReelles.dureeEnvoiDirectMax, 20)
     }
 
     func testTikTokMorceauxEtPoignee() {

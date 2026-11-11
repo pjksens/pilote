@@ -3,19 +3,21 @@
 import SwiftUI
 
 enum JourAffiche {
-    private static func format(_ motif: String, _ jour: String, majuscule: Bool = true) -> String {
-        guard let d = Dates.jour.date(from: jour) else { return jour }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.timeZone = TimeZone(identifier: "Europe/Paris")
-        f.dateFormat = motif
-        let s = f.string(from: d)
+    /// Midi (heure du Mac) du jour « aaaa-mm-jj » : écrit puis relu dans le même fuseau, il ne change jamais de jour.
+    private static func midi(_ jour: String) -> Date? {
+        let p = jour.split(separator: "-").compactMap { Int($0) }
+        guard p.count == 3 else { return nil }
+        return Calendar.current.date(from: DateComponents(year: p[0], month: p[1], day: p[2], hour: 12))
+    }
+    private static func format(_ gabarit: String, _ jour: String, majuscule: Bool = true) -> String {
+        guard let d = midi(jour) else { return jour }
+        let s = Loc.date(d, gabarit)
         return majuscule ? s.prefix(1).uppercased() + s.dropFirst() : s
     }
-    /// « Lun. 3 »
-    static func entete(_ jour: String) -> String { format("EEE d", jour) }
-    /// « Lundi 3 novembre »
-    static func long(_ jour: String, majuscule: Bool = true) -> String { format("EEEE d MMMM", jour, majuscule: majuscule) }
+    /// « Lun. 3 » (« Mon 3 », « Lun 3 »)
+    static func entete(_ jour: String) -> String { format("EEEd", jour) }
+    /// « Lundi 3 novembre » (« Monday, November 3 », « Lunes, 3 de noviembre »)
+    static func long(_ jour: String, majuscule: Bool = true) -> String { format("EEEEdMMMM", jour, majuscule: majuscule) }
 }
 
 struct SemaineVue: View {
@@ -31,13 +33,13 @@ struct SemaineVue: View {
         let publiees = vids.filter { $0.statut == "publiee" }.count
         let pretes = vids.filter { $0.statut == "prete" }.count
         let sujets = vids.filter { $0.statut != "a_choisir" && $0.statut != "annulee" }.count
-        return "\(publiees) publiées · \(pretes) prêtes · \(sujets) sujets validés sur 10"
+        return [L("\(publiees) publiées"), L("\(pretes) prêtes"), L("\(sujets) sujets validés sur 10")].joined(separator: " · ")
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                EnTete(titre: "Vidéos", detail: "2 par jour du lundi au vendredi, tournées et montées la veille")
+                EnTete(titre: L("Vidéos"), detail: L("2 par jour du lundi au vendredi, tournées et montées la veille"))
                 navigation
                 grille
                 legende
@@ -83,7 +85,7 @@ struct SemaineVue: View {
 
     private var legende: some View {
         HStack(spacing: 16) {
-            ForEach([(TonVideo.vert, "Prête ou publiée"), (.ambre, "À faire aujourd'hui"), (.rouge, "En retard ou sans sujet"), (.neutre, "Plus tard")], id: \.1) { t in
+            ForEach([(TonVideo.vert, L("Prête ou publiée")), (.ambre, L("À faire aujourd'hui")), (.rouge, L("En retard ou sans sujet")), (.neutre, L("Plus tard"))], id: \.1) { t in
                 HStack(spacing: 6) {
                     Circle().fill(Couleurs.ton(t.0)).frame(width: 9, height: 9)
                     Text(t.1).font(.petit).foregroundStyle(Color.texte2)
@@ -96,9 +98,9 @@ struct SemaineVue: View {
 
     private var reserve: some View {
         let sujets = etat.videos.filter { $0.jour.isEmpty && $0.statut != "annulee" }
-        return Carte(titre: "Sujets de réserve", detail: "si un sujet tombe") {
+        return Carte(titre: L("Sujets de réserve"), detail: L("si un sujet tombe")) {
             if sujets.isEmpty {
-                EtatVide(texte: "Aucun sujet de réserve. Il en faut un par compte, choisi le dimanche.")
+                EtatVide(texte: L("Aucun sujet de réserve. Il en faut un par compte, choisi le dimanche."))
             } else {
                 ForEach(Array(sujets.enumerated()), id: \.element.id) { i, v in
                     LigneCarte(dernier: i == sujets.count - 1) {
@@ -138,7 +140,7 @@ struct TuileVideo: View {
                 Spacer(minLength: 0)
                 if let h = v?.heure, !h.isEmpty, !compacte { Text(h).font(.petit.monospacedDigit()).foregroundStyle(Color.texte3) }
             }
-            Text(sujet.isEmpty ? "Pas de sujet" : sujet)
+            Text(sujet.isEmpty ? L("Pas de sujet") : sujet)
                 .font(compacte ? .secondaire.weight(.medium) : .ligneForte)
                 .foregroundStyle(sujet.isEmpty ? Color.texte3 : Color.texte)
                 .lineLimit(compacte ? 3 : 3)
@@ -182,7 +184,7 @@ struct DetailVideo: View {
     var body: some View {
         let v = etat.video(jour: jour, compte: compte)
         VStack(alignment: .leading, spacing: 12) {
-            Text("\(VideoVocabulaire.compte(compte)) · \(JourAffiche.long(jour))").font(.titreSection).foregroundStyle(Color.texte)
+            Text(verbatim: "\(VideoVocabulaire.compte(compte)) · \(JourAffiche.long(jour))").font(.titreSection).foregroundStyle(Color.texte)
             TextField("Sujet", text: $sujet, axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(1...4)
                 .onSubmit { enregistrerSujet(v) }
@@ -190,8 +192,7 @@ struct DetailVideo: View {
                                               set: { etat.changerVideo(jour: jour, compte: compte, statut: $0) })) {
                 ForEach(VideoVocabulaire.statuts, id: \.0) { Text($0.1).tag($0.0) }
             }
-            Text("Tournage et montage : \(JourAffiche.long(VideoCalcul.veilleOuvree(jour), majuscule: false))\(v.map { $0.heure.isEmpty ? "" : " · publication à \($0.heure)" } ?? "")")
-                .font(.secondaire).foregroundStyle(Color.texte2)
+            Text(tournage(v)).font(.secondaire).foregroundStyle(Color.texte2)
             if let v, !v.notes.isEmpty {
                 Text(v.notes).font(.secondaire).foregroundStyle(Color.texte2).textSelection(.enabled)
             }
@@ -206,6 +207,12 @@ struct DetailVideo: View {
         .padding(16)
         .frame(width: 360)
         .onAppear { sujet = v?.sujet ?? "" }
+    }
+
+    private func tournage(_ v: Video?) -> String {
+        var p = [L("Tournage et montage : \(JourAffiche.long(VideoCalcul.veilleOuvree(jour), majuscule: false))")]
+        if let h = v?.heure, !h.isEmpty { p.append(L("publication à \(h)")) }
+        return p.joined(separator: " · ")
     }
 
     private func enregistrerSujet(_ v: Video?) {

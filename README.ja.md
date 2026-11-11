@@ -150,7 +150,7 @@ them. For each item, only write what you actually verified.
   <br><sub>デモモード（<code>./scripts/demo.sh</code>）：架空のデータで、実在の人物は登場しません。</sub>
 </p>
 
-> アプリの画面表示とコード内のコメントはフランス語です。この README は 9 言語で用意されていますが、アプリ自体は（まだ）対応していません。
+> アプリの画面表示は Mac の言語に従います：英語、フランス語、スペイン語（それ以外の言語では英語）。コード内のコメント、コマンドラインツール `pilote`、MCP サーバーはフランス語のままです。この README は 9 言語で用意されています。
 
 ## Pilote でできること
 
@@ -160,6 +160,7 @@ them. For each item, only write what you actually verified.
 - **エージェント。** Mac で開いている Claude Code のセッション、その状態と直近の動作、そして成果物のジャーナル（Claude Code の `Stop` フックが記録します）。
 - **仕事のマップ。** すべてのプロジェクト、そのフォルダー、`ETAT.md`（状態ファイル）、主要なドキュメント。プロジェクト、連絡先、ジャーナル、ファイル（Spotlight）を横断してすべてを検索できます（⌘K）。
 - **メールは自分の手で。** 用意されたメールは、あなたがクリックしたときだけ、あなた自身の Gmail から送信されます（SMTP。アプリパスワードは macOS のキーチェーンに保存され、Claude が読むことはありません）。プレーンテキストで、返信は正しいスレッドにまとまります。
+- **Pip（任意）。** [Pip](https://github.com/pjksens/heypip)（通話に寄り添う Mac のノッチアプリ）がインストールされていれば、カレンダーのビデオ通話に「Launch Pip」ボタンが表示されます。Pip は通話名と紐づけた連絡先を持って開きます。任意で、Pilote が 2 分前に自動で開くこともできます。Pip はあなた自身のクリックの後にしか録音せず、Claude が通話の要約を書くと、Pilote がそれを連絡先のスレッドに保存します。カレンダーを読むため、既定ではオフの `rappels_calendrier` に従います。
 - **投稿。** YouTube、Instagram、TikTok への動画投稿を予約できます。公開の前には毎回、明示的な承認が必要です（トークンはキーチェーンに保存）。
 - **レーダー。** SNS アカウントを観察します（再生数、投稿のペース、アイデア）。手入力のほか、有料のデータソース経由でも取得できますが、あなたの確認なしに実行されることはありません。
 
@@ -172,14 +173,14 @@ them. For each item, only write what you actually verified.
   <br><sub>セッションがいま何をしているかを確認し、Pilote を離れずにそのうちの 1 つへメッセージを送れます。</sub>
 </p>
 
-セッションが判断を必要とすると、その質問がボタンつきでホーム画面に表示されます。あなたの回答は **「Vos réponses, prêtes à partir」**（あなたの回答、送信待ち）に置かれ、**Envoyer**（送信）をクリックするまで保留されます。セッションに誤って何かが届くことはありません。
+セッションが判断を必要とすると、その質問がボタンつきでホーム画面に表示されます。あなたの回答は **「Your replies, ready to go」**（あなたの回答、送信待ち）に置かれ、**Send**（送信）をクリックするまで保留されます。セッションに誤って何かが届くことはありません。
 
 <p align="center">
   <img src="docs/media/facteur.gif" width="720" alt="ホーム画面に表示されたセッションからの質問：回答をワンクリックで選び、送信します">
   <br><sub>セッションが質問し、あなたはワンクリックで答え、送り出すタイミングも自分で決めます。</sub>
 </p>
 
-> **回答がセッションに届く仕組み：** [`scripts/facteur.py`](scripts/facteur.py)、「Facteur」（郵便配達員）です。ホーム画面の **Démarrer le Facteur** ボタンを押すと、指示付きの Claude Code セッションが開きます。このセッションはバックグラウンドで待機し、各回答を数秒以内に適切なセッションへ届けます。届け先は質問したセッション、またはあなたがメッセージを書いたセッションです。なければ `reglages.json` の `facteur.sessions` で指定したセッション、それもなければ `EQUIPE.md` の表にあるセッションです。コードにはセッション ID を一切書いていません。
+> **回答がセッションに届く仕組み：** [`scripts/facteur.py`](scripts/facteur.py)、「Facteur」（郵便配達員）です。ホーム画面の **Start Facteur** ボタンを押すと、指示付きの Claude Code セッションが開きます。このセッションはバックグラウンドで待機し、各回答を数秒以内に適切なセッションへ届けます。届け先は質問したセッション、またはあなたがメッセージを書いたセッションです。なければ `reglages.json` の `facteur.sessions` で指定したセッション、それもなければ `EQUIPE.md` の表にあるセッションです。コードにはセッション ID を一切書いていません。
 
 ## ご注意
 
@@ -199,9 +200,9 @@ them. For each item, only write what you actually verified.
 
 | | |
 |---|---|
-| ![エージェント：Claude Code のセッションとそのジャーナル](docs/captures/10-claude.png) | ![連絡先：アドレス帳、ステージ、次のアクション](docs/captures/04-contacts.png) |
+| ![エージェント：Claude Code のセッションとそのジャーナル](docs/captures/09-claude.png) | ![連絡先：アドレス帳、ステージ、次のアクション](docs/captures/04-contacts.png) |
 | ![見込み客：ステージ別のボード](docs/captures/03-prospects.png) | ![動画：1 週間、2 つのアカウント](docs/captures/05-semaine.png) |
-| ![タスク：カードをドラッグして日付を変更](docs/captures/08-taches.png) | ![ダークモードのホーム画面](docs/captures/01-aujourdhui-sombre.png) |
+| ![タスク：カードをドラッグして日付を変更](docs/captures/07-taches.png) | ![ダークモードのホーム画面](docs/captures/01-aujourdhui-sombre.png) |
 
 スクリーンショットに写っているデータはすべて架空のものです（名前、会社名、フランスの架空用番号帯 06 39 98 00 0x の電話番号、`.example` のアドレス）。
 
@@ -272,7 +273,7 @@ from organisations o left join utilisateurs u on u.organisation_id = o.id;
 
 **キー。** Pilote に与える権限は最小限にしてください。**このビューの読み取りだけ**ができるトークンが理想です。たとえば、そのビューに対する `select` 権限だけを持つ専用の Postgres ロールを作ります（そのロールに紐づくトークンの取得方法は、お使いのデータベースのドキュメントを参照してください）。**Supabase の `service_role`（または「secret」）キーは絶対に使わないでください**。このキーはデータベース全体を読み書きでき、行レベルセキュリティも回避します。また、ビューを `anon` ロールから読めるようにするのも避けてください。「anon」キーはあなたのアプリの中で公開されています。
 
-**Stripe**（`stripe_cle`、任意）：「Subscriptions: Read」の権限だけを持つ**制限付きキー**（`rk_…`）を使います。トライアル中のアカウントと有料アカウントを見分けるためのもので、これがない場合、サブスクリプションのあるアカウントは「À vérifier」（要確認）と表示されます。
+**Stripe**（`stripe_cle`、任意）：「Subscriptions: Read」の権限だけを持つ**制限付きキー**（`rk_…`）を使います。トライアル中のアカウントと有料アカウントを見分けるためのもので、これがない場合、サブスクリプションのあるアカウントは「To check」（要確認）と表示されます。
 
 **カウンター**（`compteur`、任意）：`dossier` で実行されるあなたのコマンドです。`ACTIFS 7 / 10` という行を出力し、続けてセクションの見出しと、その下に 2 スペースでインデントした行を出力します。
 

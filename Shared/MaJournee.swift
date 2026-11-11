@@ -35,6 +35,15 @@ enum Report: String, CaseIterable, Identifiable {
     case demain = "Demain", apresDemain = "Après-demain", lundi = "Lundi prochain"
     var id: String { rawValue }
 
+    /// Le libellé à l'écran (la valeur brute reste le français : elle sert d'identifiant).
+    var libelle: String {
+        switch self {
+        case .demain: return L("Demain")
+        case .apresDemain: return L("Après-demain")
+        case .lundi: return L("Lundi prochain")
+        }
+    }
+
     func jour(depuis maintenant: Date, cal: Calendar = .current) -> Date {
         let debut = cal.startOfDay(for: maintenant)
         switch self {
@@ -56,14 +65,16 @@ enum MaJournee {
     static let heureBrief = 7
 
     /// La semaine type du CAP : les créneaux des jours ouvrés, et le bilan du samedi matin.
-    static let cadreSemaine: [(heure: String, titre: String)] = [
-        ("09:00", "Produire : freelance en cours, sinon tournage (jusqu'à 12 h)"),
-        ("12:00", "Appeler les artisans, pause de midi (jusqu'à 13 h 30)"),
-        ("14:00", "Publier + 5 messages de prospection freelance (jusqu'à 16 h)"),
-        ("16:00", "Démos KRYVA, relances, devis freelance, papiers (jusqu'à 17 h 30)"),
-        ("17:30", "Appeler les artisans, sortie de chantier (jusqu'à 19 h)"),
-    ]
-    static let cadreSamedi: [(heure: String, titre: String)] = [("09:00", "Bilan des 4 chiffres avec PILOTE (30 min)")]
+    static var cadreSemaine: [(heure: String, titre: String)] {
+        [
+            ("09:00", L("Produire : freelance en cours, sinon tournage (jusqu'à 12 h)")),
+            ("12:00", L("Appeler les artisans, pause de midi (jusqu'à 13 h 30)")),
+            ("14:00", L("Publier + 5 messages de prospection freelance (jusqu'à 16 h)")),
+            ("16:00", L("Démos KRYVA, relances, devis freelance, papiers (jusqu'à 17 h 30)")),
+            ("17:30", L("Appeler les artisans, sortie de chantier (jusqu'à 19 h)")),
+        ]
+    }
+    static var cadreSamedi: [(heure: String, titre: String)] { [("09:00", L("Bilan des 4 chiffres avec PILOTE (30 min)"))] }
 
     private static var cal: Calendar {
         var c = Calendar(identifier: .gregorian)
@@ -105,7 +116,7 @@ enum MaJournee {
 
         for (i, r) in rendezVous.enumerated() where duJour(r.debut) {
             e.append(ElementJournee(id: "rdv-\(i)", heure: r.avecHeure ? hm.string(from: r.debut) : "", titre: r.titre,
-                                    detail: [r.fin.map { r.avecHeure ? "jusqu'à \(hm.string(from: $0))" : "" } ?? "", r.source]
+                                    detail: [r.fin.map { r.avecHeure ? L("jusqu'à \(hm.string(from: $0))") : "" } ?? "", r.source]
                                         .filter { !$0.isEmpty }.joined(separator: " · "),
                                     genre: .rendezVous, lien: r.lien, cible: r.cible, fait: r.fait))
         }
@@ -123,10 +134,10 @@ enum MaJournee {
             if let v = videos.first(where: { $0.jour == aujourdhui && $0.compte == compte }), v.statut != "annulee",
                !rappelCouvre(rappels, compte: compte, action: "publier") {
                 let publiee = v.statut == "publiee"
-                let pasPrete = publiee || v.statut == "prete" ? "" : "pas encore prête (\(VideoVocabulaire.statut(v.statut).lowercased()))"
+                let pasPrete = publiee || v.statut == "prete" ? "" : L("pas encore prête (\(VideoVocabulaire.statut(v.statut).lowercased()))")
                 e.append(ElementJournee(id: "publier-\(compte)", heure: v.heure,
-                                        titre: v.sujet.isEmpty || v.statut == "a_choisir" ? "Publier la vidéo \(nom) : sujet à choisir"
-                                            : "Publier la vidéo \(nom) : \(v.sujet)",
+                                        titre: v.sujet.isEmpty || v.statut == "a_choisir" ? L("Publier la vidéo \(nom) : sujet à choisir")
+                                            : L("Publier la vidéo \(nom) : \(v.sujet)"),
                                         detail: pasPrete, genre: .video, lien: v.fiche.isEmpty ? v.prompteur : v.fiche,
                                         cible: v.statut == "a_choisir" ? "" : VideoCalcul.cible(jour: aujourdhui, compte: compte, action: "publier"),
                                         fait: publiee))
@@ -135,23 +146,23 @@ enum MaJournee {
             let demain = VideoCalcul.lendemainOuvre(aujourdhui)
             let quand = DemainPret.libelleJour(demain)
             guard let v = videos.first(where: { $0.jour == demain && $0.compte == compte }) else {
-                e.append(ElementJournee(id: "tourner-\(compte)", heure: "", titre: "Vidéo \(nom) de \(quand) : aucun sujet",
-                                        detail: "Choisir un sujet (ou la réserve) avant de tourner", genre: .video))
+                e.append(ElementJournee(id: "tourner-\(compte)", heure: "", titre: L("Vidéo \(nom) de \(quand) : aucun sujet"),
+                                        detail: L("Choisir un sujet (ou la réserve) avant de tourner"), genre: .video))
                 continue
             }
             // Tourner, puis valider le montage : cochables (« fait » = la vidéo avance d'un statut) ; une fois faits, ils restent en gris.
             let avancee = ["valide", "tournee", "prete", "publiee"].contains(v.statut)
             if v.statut == "a_choisir" {
-                e.append(ElementJournee(id: "tourner-\(compte)", heure: "", titre: "Choisir le sujet de la vidéo \(nom) de \(quand)",
+                e.append(ElementJournee(id: "tourner-\(compte)", heure: "", titre: L("Choisir le sujet de la vidéo \(nom) de \(quand)"),
                                         detail: v.sujet, genre: .video, lien: v.fiche))
             } else if avancee, !rappelCouvre(rappels, compte: compte, action: "tourner") {
                 e.append(ElementJournee(id: "tourner-\(compte)", heure: heureDans(v.notes, apres: "tournage") ?? "",
-                                        titre: "Tourner la vidéo \(nom) de \(quand) : \(v.sujet)", genre: .video,
+                                        titre: L("Tourner la vidéo \(nom) de \(quand) : \(v.sujet)"), genre: .video,
                                         lien: v.prompteur.isEmpty ? v.fiche : v.prompteur,
                                         cible: VideoCalcul.cible(jour: demain, compte: compte, action: "tourner"), fait: v.statut != "valide"))
             }
             if avancee, !rappelCouvre(rappels, compte: compte, action: "valider"), let h = heureDans(v.notes, apres: "valider") {
-                e.append(ElementJournee(id: "valider-\(compte)", heure: h, titre: "Valider le montage de la vidéo \(nom) de \(quand)",
+                e.append(ElementJournee(id: "valider-\(compte)", heure: h, titre: L("Valider le montage de la vidéo \(nom) de \(quand)"),
                                         detail: v.sujet, genre: .video, lien: v.fiche,
                                         cible: VideoCalcul.cible(jour: demain, compte: compte, action: "valider"),
                                         fait: ["prete", "publiee"].contains(v.statut)))
@@ -161,17 +172,19 @@ enum MaJournee {
         let ouvre = VideoCalcul.estOuvre(aujourdhui)
         if messagesKryva > 0 {
             e.append(ElementJournee(id: "prospects-kryva", heure: ouvre ? "12:00" : "",
-                                    titre: "Artisans KRYVA : \(messagesKryva) message\(messagesKryva > 1 ? "s" : "") prêt\(messagesKryva > 1 ? "s" : "") à envoyer",
-                                    detail: "Aujourd'hui › Prospects du jour", genre: .prospects))
+                                    titre: messagesKryva == 1 ? L("Artisans KRYVA : 1 message prêt à envoyer")
+                                        : L("Artisans KRYVA : \(messagesKryva) messages prêts à envoyer"),
+                                    detail: L("Aujourd'hui › Prospects du jour"), genre: .prospects))
         }
         if messagesFreelance > 0 {
             e.append(ElementJournee(id: "prospects-freelance", heure: ouvre ? "14:00" : "",
-                                    titre: "Freelance : \(messagesFreelance) message\(messagesFreelance > 1 ? "s" : "") prêt\(messagesFreelance > 1 ? "s" : "") à envoyer",
-                                    detail: "Aujourd'hui › Prospects du jour", genre: .prospects))
+                                    titre: messagesFreelance == 1 ? L("Freelance : 1 message prêt à envoyer")
+                                        : L("Freelance : \(messagesFreelance) messages prêts à envoyer"),
+                                    detail: L("Aujourd'hui › Prospects du jour"), genre: .prospects))
         }
         if decisions > 0 {
-            e.append(ElementJournee(id: "decisions", heure: "", titre: decisions == 1 ? "1 décision à prendre" : "\(decisions) décisions à prendre",
-                                    detail: "Aujourd'hui › À décider", genre: .decision))
+            e.append(ElementJournee(id: "decisions", heure: "", titre: decisions == 1 ? L("1 décision à prendre") : L("\(decisions) décisions à prendre"),
+                                    detail: L("Aujourd'hui › À décider"), genre: .decision))
         }
 
         let cadre: [(heure: String, titre: String)]
@@ -179,7 +192,7 @@ enum MaJournee {
             cadre = cadreSamedi
         } else { cadre = [] }
         e += cadre.enumerated().map { ElementJournee(id: "cadre-\($0.offset)", heure: $0.element.heure, titre: $0.element.titre,
-                                                     detail: "Semaine type du CAP", genre: .cadre) }
+                                                     detail: L("Semaine type du CAP"), genre: .cadre) }
 
         // Sans heure d'abord, puis dans l'ordre des heures ; à la même heure, le cadre passe après le reste.
         return e.sorted { a, b in

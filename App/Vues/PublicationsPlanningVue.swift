@@ -8,6 +8,12 @@ import SwiftUI
 enum ModePlanningPublications: String, CaseIterable, Identifiable {
     case semaine = "Semaine", mois = "Mois"
     var id: String { rawValue }
+    var titre: String {
+        switch self {
+        case .semaine: return L("Semaine")
+        case .mois: return L("Mois")
+        }
+    }
 }
 
 /// Couleur, symbole et nom court de chaque réseau (les mêmes partout dans le planning).
@@ -38,7 +44,7 @@ enum StylePublication {
         }
     }
 
-    static func espace(_ compte: String) -> String { compte.hasSuffix("kryva") ? "KRYVA" : "perso" }
+    static func espace(_ compte: String) -> String { compte.hasSuffix("kryva") ? "KRYVA" : L("perso") }
     /// « YT perso », « IG KRYVA », « TT perso » : le compte en court, pour les trous.
     static func court(_ c: ComptePublication) -> String {
         ([ReseauPublication.youtube: "YT", .instagram: "IG", .tiktok: "TT"][c.reseau] ?? "") + " " + espace(c.id)
@@ -47,16 +53,16 @@ enum StylePublication {
     /// à valider, prévu, envoyé, publié, échec, brouillon TikTok à finir (et à reconnecter, envoi en cours).
     static func statut(_ p: Publication) -> (texte: String, couleur: Color, symbole: String) {
         switch p.etat {
-        case "a_valider": return ("à valider", .ambre, "hand.raised.fill")
-        case "planifie": return ("prévu", .texte2, "clock")
-        case "envoi": return ("envoi en cours", .texte2, "arrow.up.circle")
+        case "a_valider": return (L("à valider"), .ambre, "hand.raised.fill")
+        case "planifie": return (L("prévu"), .texte2, "clock")
+        case "envoi": return (L("envoi en cours"), .texte2, "arrow.up.circle")
         case "envoye":
-            if p.reseau == .tiktok && p.phase == "boite" { return ("brouillon TikTok à finir", .ambre, "tray.and.arrow.down.fill") }
-            return ("envoyé", .vert, "checkmark.circle")
-        case "publie": return ("publié", .vert, "checkmark.seal.fill")
-        case "echec": return ("échec", .rouge, "xmark.octagon.fill")
-        case "reconnexion": return ("à reconnecter", .rouge, "exclamationmark.triangle.fill")
-        case "annule": return ("annulé", .texte3, "minus.circle")
+            if p.reseau == .tiktok && p.phase == "boite" { return (L("brouillon TikTok à finir"), .ambre, "tray.and.arrow.down.fill") }
+            return (L("envoyé"), .vert, "checkmark.circle")
+        case "publie": return (L("publié"), .vert, "checkmark.seal.fill")
+        case "echec": return (L("échec"), .rouge, "xmark.octagon.fill")
+        case "reconnexion": return (L("à reconnecter"), .rouge, "exclamationmark.triangle.fill")
+        case "annule": return (L("annulé"), .texte3, "minus.circle")
         default: return (p.etat, .texte2, "circle")
         }
     }
@@ -79,7 +85,7 @@ struct PlanningPublicationsVue: View {
 
     static var calendrier: Calendar {
         var c = Calendar(identifier: .gregorian)
-        c.locale = Locale(identifier: "fr_FR")
+        c.locale = Loc.locale
         c.timeZone = TimeZone(identifier: "Europe/Paris")!
         c.firstWeekday = 2
         return c
@@ -139,19 +145,20 @@ struct PlanningPublicationsVue: View {
     // MARK: Barre, légende
 
     private var titrePeriode: String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.timeZone = cal.timeZone
         switch mode {
         case .semaine:
             guard let a = jours.first, let b = jours.last else { return "" }
-            f.dateFormat = "d MMMM"
-            let fin = f.string(from: b)
-            f.dateFormat = cal.isDate(a, equalTo: b, toGranularity: .month) ? "d" : "d MMMM"
-            return "Semaine du \(f.string(from: a)) au \(fin)"
+            // Français : « Semaine du 9 au 15 novembre » (le mois n'est dit qu'une fois s'il est le même). Autres langues :
+            // les deux dates en entier, dans l'ordre et la forme de la langue (« Week of Nov 9 to Nov 15 »).
+            if Loc.estFrancais {
+                let debut = Publications.dateParis(a, "dMMMM")
+                let fin = Publications.dateParis(b, "dMMMM")
+                let jourDebut = cal.isDate(a, equalTo: b, toGranularity: .month) ? String(cal.component(.day, from: a)) : debut
+                return L("Semaine du \(jourDebut) au \(fin)")
+            }
+            return L("Semaine du \(Publications.dateParis(a, "dMMM")) au \(Publications.dateParis(b, "dMMM"))")
         case .mois:
-            f.dateFormat = "LLLL yyyy"
-            let t = f.string(from: reference)
+            let t = Publications.dateParis(reference, "LLLLyyyy")
             return t.prefix(1).uppercased() + t.dropFirst()
         }
     }
@@ -165,7 +172,7 @@ struct PlanningPublicationsVue: View {
             Spacer()
             Text(resume).font(.secondaire).foregroundStyle(Color.texte2)
             Picker("", selection: $mode) {
-                ForEach(ModePlanningPublications.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(ModePlanningPublications.allCases) { Text($0.titre).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
         }
@@ -174,9 +181,9 @@ struct PlanningPublicationsVue: View {
     private var resume: String {
         let trous = jours.filter { !manques($0).isEmpty }.count
         let doubles = jours.filter { !doublons($0).isEmpty }.count
-        var l = ["\(pubs.count) publication\(pubs.count > 1 ? "s" : "")"]
-        if trous > 0 { l.append("\(trous) jour\(trous > 1 ? "s" : "") à trou") }
-        if doubles > 0 { l.append("\(doubles) jour\(doubles > 1 ? "s" : "") avec doublon") }
+        var l = [L("\(pubs.count) publications")]
+        if trous > 0 { l.append(L("\(trous) jours à trou")) }
+        if doubles > 0 { l.append(L("\(doubles) jours avec doublon")) }
         return l.joined(separator: " · ")
     }
 
@@ -256,15 +263,16 @@ struct PlanningPublicationsVue: View {
         }
     }
 
+    /// « Lun », « Mon », « Lun » : le jour de la semaine en court, dans la langue de l'app, avec une majuscule et sans point.
+    private func nomCourtDuJour(_ d: Date) -> String {
+        let nom = Publications.dateParis(d, "EEE").replacingOccurrences(of: ".", with: "")
+        return nom.prefix(1).uppercased() + nom.dropFirst()
+    }
+
     private func enTeteJour(_ d: Date) -> some View {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.timeZone = cal.timeZone
-        f.dateFormat = "EEE"
-        let nom = f.string(from: d).replacingOccurrences(of: ".", with: "")
-        return VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(nom.prefix(1).uppercased() + nom.dropFirst()).font(.secondaire).foregroundStyle(Color.texte2)
+                Text(nomCourtDuJour(d)).font(.secondaire).foregroundStyle(Color.texte2)
                 Text("\(cal.component(.day, from: d))").font(.titreSection)
                     .foregroundStyle(estAujourdhui(d) ? Color.action : Color.texte)
                 Spacer()
@@ -290,8 +298,8 @@ struct PlanningPublicationsVue: View {
         let moisMontre = cal.component(.month, from: reference)
         return VStack(spacing: 6) {
             HStack(spacing: 6) {
-                ForEach(["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"], id: \.self) {
-                    Text($0).font(.petit.weight(.medium)).foregroundStyle(Color.texte2).frame(maxWidth: .infinity)
+                ForEach(Array(jours.prefix(7)), id: \.self) {
+                    Text(nomCourtDuJour($0)).font(.petit.weight(.medium)).foregroundStyle(Color.texte2).frame(maxWidth: .infinity)
                 }
             }
             LazyVGrid(columns: colonnes, spacing: 6) {
@@ -311,7 +319,7 @@ struct PlanningPublicationsVue: View {
                 Spacer()
                 if !manque.isEmpty {
                     Image(systemName: "exclamationmark.circle.fill").font(.petit).foregroundStyle(Color.rouge)
-                        .help("manque " + manque.joined(separator: " et "))
+                        .help(aideManque(manque))
                 }
                 if !double.isEmpty { Image(systemName: "square.on.square").font(.petit).foregroundStyle(Color.ambre).help("doublon") }
             }
@@ -345,6 +353,13 @@ struct PlanningPublicationsVue: View {
         guard let d = p.prevu else { return "--:--" }
         let c = cal.dateComponents([.hour, .minute], from: d)
         return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+    }
+
+    /// « manque YT perso et IG KRYVA » : les comptes sans vidéo, reliés comme le fait la langue (« et », « and », « y »).
+    private func aideManque(_ comptes: [String]) -> String {
+        let liste = ListFormatter()
+        liste.locale = Loc.locale
+        return L("manque \(liste.string(from: comptes) ?? comptes.joined(separator: ", "))")
     }
 }
 
@@ -397,7 +412,7 @@ struct CartePublicationPlanning: View {
             .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
-        .help("\(ComptePublication.trouver(p.compte)?.nom ?? p.compte) · « \(Publications.apercu(p)) »")
+        .help("\(ComptePublication.trouver(p.compte)?.nom ?? p.compte) · \(Publications.entreGuillemets(Publications.apercu(p)))" as String)
     }
 
     private func heureParis(_ p: Publication) -> String {
@@ -454,18 +469,18 @@ struct DetailPublicationVue: View {
                     Spacer()
                     Pastille(texte: s.texte, couleur: s.couleur)
                 }
-                Text(Publications.heureParis(p.prevuLe)).font(.ligne).foregroundStyle(Color.texte2)
+                Text(Publications.heureAffichee(p.prevuLe)).font(.ligne).foregroundStyle(Color.texte2)
                 if !p.titre.isEmpty {
-                    champ("Titre") { Text(p.titre).font(.ligneForte).foregroundStyle(Color.texte).textSelection(.enabled) }
+                    champ(L("Titre")) { Text(p.titre).font(.ligneForte).foregroundStyle(Color.texte).textSelection(.enabled) }
                 }
-                champ(p.reseau == .youtube ? "Description" : "Légende") {
+                champ(p.reseau == .youtube ? L("Description") : L("Légende")) {
                     ScrollView {
-                        Text(p.texte.isEmpty ? "(vide)" : p.texte).font(.ligne).foregroundStyle(Color.texte)
+                        Text(p.texte.isEmpty ? L("(vide)") : p.texte).font(.ligne).foregroundStyle(Color.texte)
                             .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                     }
                     .frame(maxHeight: 140)
                 }
-                champ("Couverture") {
+                champ(L("Couverture")) {
                     Text(Publications.couvertureTexte(p)).font(.secondaire).foregroundStyle(Color.texte)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -475,8 +490,8 @@ struct DetailPublicationVue: View {
                 }
                 if !p.plugkit.isEmpty {
                     Text(p.plugkitReveilLe.isEmpty
-                         ? "Remplace le post PlugKit \(p.plugkit) : en validant, PILOTE est prévenu de le retirer."
-                         : "Remplace le post PlugKit \(p.plugkit) : PILOTE prévenu de le retirer le \(Publications.heureParis(p.plugkitReveilLe)).")
+                         ? L("Remplace le post PlugKit \(p.plugkit) : en validant, PILOTE est prévenu de le retirer.")
+                         : L("Remplace le post PlugKit \(p.plugkit) : PILOTE prévenu de le retirer le \(Publications.heureAffichee(p.plugkitReveilLe))."))
                         .font(.petit).foregroundStyle(Color.texte2).fixedSize(horizontal: false, vertical: true)
                 }
                 if p.reseau == .tiktok {
@@ -485,9 +500,9 @@ struct DetailPublicationVue: View {
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 10) {
-                    if p.etat == "a_valider" { BoutonPrincipal(titre: "Valider et programmer", symbole: "checkmark", action: valider) }
+                    if p.etat == "a_valider" { BoutonPrincipal(titre: L("Valider et programmer"), symbole: "checkmark", action: valider) }
                     if p.reseau == .tiktok && p.etat == "envoye" && p.phase == "boite" {
-                        BoutonPrincipal(titre: "Publiée", symbole: "checkmark", action: publiee)
+                        BoutonPrincipal(titre: L("Publiée"), symbole: "checkmark", action: publiee)
                     }
                     Button("Voir la vidéo") { etat.apercu = p.fichier; fermer() }
                     Button(copie ? "Légende copiée" : "Copier la légende") {

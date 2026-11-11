@@ -170,14 +170,15 @@ enum FileEnvoi {
                 vus.insert(id)
                 let e = try stock.evenement(id)
                 let c = try e.flatMap { try stock.contact($0.contactId) }
-                var raisons = EnvoiPilote.refus(e, c, expediteur: de, motDePassePresent: present)
+                // Ce qui s'écrit dans la base (colonne raison, nom du contact) reste en français, quelle que soit la langue de l'app.
+                var raisons = EnvoiPilote.refus(e, c, expediteur: de, motDePassePresent: present, francais: true)
                 if let e, e.canal != "mail" { raisons = ["canal « \(e.canal) » : seuls les mails passent par la file (SMS, LinkedIn : à la main)"] }
                 let fil = e.map { filACherche($0) ? (fils[id] ?? "") : "" } ?? ""
                 try stock.base.executer("""
                     INSERT INTO file_envoi (id, lot, rang, evenement_id, contact_id, contact, a, objet, empreinte, reponse_a,
                                             prevu_le, etat, raison, message_id, mis_le, fait_le)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)
-                    """, [UUID().uuidString.lowercased(), lot, rang, id, c?.id ?? "", c.map(EnvoiPilote.nomContact) ?? "(introuvable)",
+                    """, [UUID().uuidString.lowercased(), lot, rang, id, c?.id ?? "", c.map { EnvoiPilote.nomContact($0, francais: true) } ?? "(introuvable)",
                           c?.email.trimmingCharacters(in: .whitespaces) ?? "", e?.objet ?? "",
                           (e.flatMap { e in c.map { empreinte(e, $0) } }) ?? "", fil,
                           raisons.isEmpty ? mis : "", raisons.isEmpty ? "attente" : "refuse",
@@ -266,7 +267,7 @@ enum FileEnvoi {
             let c = try e.flatMap { try stock.contact($0.contactId) }
             let de = outils.expediteur()?.trimmingCharacters(in: .whitespaces)
             let present = de.map { !$0.isEmpty && outils.motDePassePresent($0) } ?? false
-            var raisons = EnvoiPilote.refus(e, c, expediteur: de, motDePassePresent: present)
+            var raisons = EnvoiPilote.refus(e, c, expediteur: de, motDePassePresent: present, francais: true)   // écrit dans la base
             if raisons.isEmpty, let e, let c, empreinte(e, c) != x.empreinte {
                 raisons = ["le mail a changé depuis la mise en file (texte, objet, fil, adresse ou statut) : il saute ; le remettre en file après relecture"]
             }
@@ -457,7 +458,7 @@ extension FileEnvoi {
     /// Réveille l'agent pour que le premier mail parte tout de suite (sinon il part à sa passe suivante, 30 s au plus).
     static func reveillerAgent() -> String? {
         guard agentCharge() else {
-            return "Mails en file, mais l'envoi automatique n'est pas installé (agent \(etiquette)) : rien ne partira. Arrêter la file et prévenir PILOTE."
+            return L("Mails en file, mais l'envoi automatique n'est pas installé (agent \(etiquette)) : rien ne partira. Arrêter la file et prévenir PILOTE.")
         }
         _ = lancer("/bin/launchctl", ["kickstart", cible])
         return nil
@@ -465,10 +466,10 @@ extension FileEnvoi {
 
     /// L'outil peut-il lire le mot de passe Gmail sans fenêtre ? nil = oui ; sinon la raison (rien ne partirait).
     static func accesOutil() -> String? {
-        guard FileManager.default.isExecutableFile(atPath: outil.path) else { return "Outil d'envoi introuvable (\(outil.path))." }
+        guard FileManager.default.isExecutableFile(atPath: outil.path) else { return L("Outil d'envoi introuvable (\(outil.path)).") }
         let r = lancer(outil.path, ["file-envoi", "--acces"])
         if r.code == 0 { return nil }
         let e = r.erreur.trimmingCharacters(in: .whitespacesAndNewlines)
-        return e.isEmpty ? "L'outil d'envoi ne répond pas (code \(r.code))." : e
+        return e.isEmpty ? L("L'outil d'envoi ne répond pas (code \(Int(r.code))).") : e
     }
 }

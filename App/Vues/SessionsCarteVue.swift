@@ -21,11 +21,11 @@ struct CarteVosSessions: View {
         let liste = noeuds
         let attendent = liste.filter { $0.activite?.etat == "waiting" }.count
         let travaillent = liste.filter { $0.activite?.etat == "busy" }.count
-        Carte(titre: "Vos sessions", detail: "\(travaillent) au travail · \(attendent) vous attend\(attendent > 1 ? "ent" : "")") {
+        Carte(titre: L("Vos sessions"), detail: L("\(travaillent) au travail") + " · " + L("\(attendent) vous attendent")) {
             if !etat.pyramideChargee {
-                EtatChargement(texte: "Lecture des sessions…")
+                EtatChargement(texte: L("Lecture des sessions…"))
             } else if liste.isEmpty {
-                EtatVide(texte: "Aucune session de l'équipe trouvée (EQUIPE.md).")
+                EtatVide(texte: L("Aucune session de l'équipe trouvée (EQUIPE.md)."))
             } else {
                 ForEach(Array(liste.enumerated()), id: \.element.id) { i, n in
                     LigneCarte(dernier: i == liste.count - 1) { LigneSessionEquipe(noeud: n) }
@@ -81,9 +81,9 @@ struct LigneSessionEquipe: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Circle().fill(couleur).frame(width: 8, height: 8)
             Text(noeud.membre.nom).font(.ligneForte).foregroundStyle(Color.texte).lineLimit(1)
-            Text(a?.libelleEtat ?? "Hors ligne").font(.petit.weight(.medium)).foregroundStyle(a?.etat == "waiting" ? Color.ambre : Color.texte2)
+            Text(a?.libelleEtat ?? L("Hors ligne")).font(.petit.weight(.medium)).foregroundStyle(a?.etat == "waiting" ? Color.ambre : Color.texte2)
             if let d = a?.depuis {
-                Text(d.formatted(.relative(presentation: .named).locale(Locale(identifier: "fr_FR"))))
+                Text(d.formatted(.relative(presentation: .named).locale(Loc.locale)))
                     .font(.petit).foregroundStyle(Color.texte3)
             }
             Spacer(minLength: 8)
@@ -153,7 +153,7 @@ struct LigneSessionEquipe: View {
                 let l = Facteur.libelle(m.remise, pour: noeud.membre.nom, veille: etat.prochaineVeille)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: l.fait ? "checkmark.circle.fill" : "paperplane").foregroundStyle(l.fait ? Color.vert : Color.ambre)
-                    Text("Vous, \(m.heure.formatted(date: .omitted, time: .shortened)) : \(m.texte)")
+                    Text("Vous, \(Libelles.heureFormat.string(from: m.heure)) : \(m.texte)")
                         .font(.petit).foregroundStyle(Color.texte2).lineLimit(ouvert ? 4 : 1)
                     Spacer(minLength: 6)
                     Text(l.texte).font(.petit).foregroundStyle(l.fait ? Color.vert : Color.ambre)
@@ -187,6 +187,6 @@ struct LigneSessionEquipe: View {
         do {
             try etat.ecrire(a: noeud.membre.nom, session: idApp, texte: brouillon, qui: "\(Moi.nom)")
             brouillon = ""; ecrire = false; erreur = nil
-        } catch { erreur = "Pas écrit : \(error.localizedDescription)" }
+        } catch { erreur = L("Pas écrit : \(error.localizedDescription)") }
     }
 }

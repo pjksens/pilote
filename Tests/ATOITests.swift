@@ -27,6 +27,22 @@ final class ATOITests: XCTestCase {
         return MessageAEnvoyer(evenement: e, contact: contact("c-\(id)", "Contact \(id)", date: date), aujourdhui: aujourdhui)
     }
 
+    /// 09/11 (Organisation) : une ligne « Valider le texte · » sans nom ne sort jamais ; sans prénom ni nom, l'entreprise,
+    /// sinon le téléphone, sinon l'e-mail.
+    func testLigneSansNomDitLEntreprise() {
+        func texte(_ id: String, _ c: Contact) -> MessageAEnvoyer {
+            MessageAEnvoyer(evenement: message(id, statut: "a_valider").evenement, contact: c, aujourdhui: aujourdhui)
+        }
+        var garage = Contact(id: "c-g"); garage.entreprise = "Garage Exemple"; garage.telephone = "06 98 76 54 32"
+        var tel = Contact(id: "c-t"); tel.telephone = "06 12 34 56 78"; tel.email = "moulin@example.fr"
+        var mail = Contact(id: "c-m"); mail.email = "moulin@example.fr"
+        var s = SourcesATOI(maintenant: maintenant)
+        s.aValider = [texte("t1", garage), texte("t2", tel), texte("t3", mail), texte("t4", Contact(id: "c-v"))]
+        let objets = GesteSacha.du(s).filter { $0.id.hasPrefix("texte:") }.map { $0.objet }
+        XCTAssertEqual(objets.sorted(), ["06 12 34 56 78", "Contact sans nom", "Garage Exemple", "moulin@example.fr"])
+        XCTAssertFalse(objets.contains { $0.trimmingCharacters(in: CharacterSet.whitespaces).isEmpty })
+    }
+
     private func rappel(_ id: String, _ titre: String, liste: String, dans h: Double = 2, retard: Bool = false,
                         notes: String = "") -> Rappel {
         Rappel(id: id, titre: titre, notes: notes, liste: liste, echeance: maintenant.addingTimeInterval(h * heure),

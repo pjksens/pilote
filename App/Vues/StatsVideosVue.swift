@@ -34,7 +34,7 @@ struct StatsVideosVue: View {
                     EtatErreur(texte: e, reessayer: { etat.chargerSuivi(force: true) })
                     Spacer()
                 } else if posts.isEmpty {
-                    EtatVide(texte: "Aucune vidéo avec ce filtre.")
+                    EtatVide(texte: L("Aucune vidéo avec ce filtre."))
                     Spacer()
                 } else {
                     List(selection: $etat.suiviSelection) {
@@ -73,7 +73,9 @@ struct StatsVideosVue: View {
     private var resumeListe: String {
         let jugees = posts.filter { $0.verdict != nil }.count
         let aReleve = posts.filter { SuiviVideo.etat($0, .h48, maintenant: Date()) == .aReleve || SuiviVideo.etat($0, .j7, maintenant: Date()) == .aReleve }.count
-        return "\(posts.count) vidéos · \(jugees) jugées" + (aReleve > 0 ? " · \(aReleve) à relever" : "")
+        var p = [L("\(posts.count) vidéos"), L("\(jugees) jugées")]
+        if aReleve > 0 { p.append(L("\(aReleve) à relever")) }
+        return p.joined(separator: " · ")
     }
 }
 
@@ -82,22 +84,21 @@ struct StatsVideosVue: View {
 private enum Fmt {
     static func nombre(_ n: Int?) -> String {
         guard let n else { return "—" }
-        let f = NumberFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.numberStyle = .decimal
-        return f.string(from: NSNumber(value: n)) ?? "\(n)"
+        return n.formatted(.number.locale(Loc.locale))
     }
-    static func decimal(_ d: Double) -> String { String(format: "%.1f", d).replacingOccurrences(of: ".", with: ",") }
+    static func decimal(_ d: Double) -> String { d.formatted(.number.precision(.fractionLength(1)).grouping(.never).locale(Loc.locale)) }
     static func pct(_ d: Double?) -> String {
         guard let d else { return "—" }
-        return (d == d.rounded() ? String(Int(d)) : decimal(d)) + " %"
+        // Le signe % se colle au nombre en anglais, s'en sépare en français et en espagnol.
+        return (d == d.rounded() ? String(Int(d)) : decimal(d)) + (Loc.langue == "en" ? "%" : " %")
     }
     static func secondes(_ d: Double?) -> String { d.map { decimal($0) + " s" } ?? "—" }
     static func jour(_ iso: String) -> String {
         let p = iso.prefix(10).split(separator: "-")
         guard p.count == 3 else { return iso }
-        let heure = iso.count >= 16 ? " à " + iso.dropFirst(11).prefix(5) : ""
-        return "\(p[2])/\(p[1])/\(p[0])" + heure
+        let date = "\(p[2])/\(p[1])/\(p[0])"
+        guard iso.count >= 16 else { return date }
+        return L("\(date) à \(String(iso.dropFirst(11).prefix(5)))")
     }
     static func court(_ iso: String) -> String {
         let p = iso.prefix(10).split(separator: "-")
@@ -127,7 +128,7 @@ private struct LignePost: View {
                 badge
             }
             HStack(spacing: 6) {
-                Text("\(post.reseau) · \(post.compte) · \(Fmt.court(post.publieLe))").font(.petit).foregroundStyle(Color.texte2)
+                Text(verbatim: "\(post.reseau) · \(post.compte) · \(Fmt.court(post.publieLe))").font(.petit).foregroundStyle(Color.texte2)
                 Spacer(minLength: 6)
                 Text(vues).font(.petit).foregroundStyle(Color.texte2)
             }
@@ -137,25 +138,25 @@ private struct LignePost: View {
     }
 
     private var vues: String {
-        guard let v = post.dernier?.vues else { return post.releves.isEmpty ? "pas de relevé" : "vues ?" }
-        return Fmt.nombre(v) + " vues"
+        guard let v = post.dernier?.vues else { return post.releves.isEmpty ? L("pas de relevé") : L("vues ?") }
+        return L("\(Fmt.nombre(v)) vues")
     }
 
     @ViewBuilder private var badge: some View {
         let maintenant = Date()
         let e48 = SuiviVideo.etat(post, .h48, maintenant: maintenant), e7 = SuiviVideo.etat(post, .j7, maintenant: maintenant)
         if e48 == .aReleve || e7 == .aReleve {
-            Pastille(texte: "À relever", couleur: .ambre)
+            Pastille(texte: L("À relever"), couleur: .ambre)
         } else if e48 == .aJuger || e7 == .aJuger {
-            Pastille(texte: "À juger", couleur: .texte2)
+            Pastille(texte: L("À juger"), couleur: .texte2)
         } else if let v = post.verdict {
-            Pastille(texte: VerdictVocabulaire.libelle(v.verdict) + " · " + v.palier, couleur: couleurVerdict(v.verdict))
+            Pastille(texte: VerdictVocabulaire.libelle(v.verdict) + " · " + PalierReleve.affichage(code: v.palier), couleur: couleurVerdict(v.verdict))
         } else if post.releves.isEmpty {
-            Pastille(texte: "Sans relevé", couleur: .texte3)
+            Pastille(texte: L("Sans relevé"), couleur: .texte3)
         } else if e48 == .manque || e7 == .manque {
-            Pastille(texte: "Relevé manqué", couleur: .texte3)
+            Pastille(texte: L("Relevé manqué"), couleur: .texte3)
         } else {
-            Pastille(texte: "En attente", couleur: .texte3)
+            Pastille(texte: L("En attente"), couleur: .texte3)
         }
     }
 }
@@ -166,16 +167,16 @@ private struct VerdictPalier: View {
     let post: PostVideo
     let palier: PalierReleve
 
-    private var titre: String { palier == .j7 ? "À 7 jours : l'analyse de fond" : "À 48 h : le premier avis" }
+    private var titre: String { palier == .j7 ? L("À 7 jours : l'analyse de fond") : L("À 48 h : le premier avis") }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(titre).font(.ligneForte).foregroundStyle(Color.texte)
             if let v = post.verdict(palier) {
                 Pastille(texte: VerdictVocabulaire.libelle(v.verdict), couleur: couleurVerdict(v.verdict))
-                if !v.pourquoi.isEmpty { Bloc(titre: "Pourquoi", texte: v.pourquoi) }
-                if !v.lecon.isEmpty { Bloc(titre: "Leçon", texte: v.lecon) }
-                if !v.analyse.isEmpty { Bloc(titre: "Analyse", texte: v.analyse) }
+                if !v.pourquoi.isEmpty { Bloc(titre: L("Pourquoi"), texte: v.pourquoi) }
+                if !v.lecon.isEmpty { Bloc(titre: L("Leçon"), texte: v.lecon) }
+                if !v.analyse.isEmpty { Bloc(titre: L("Analyse"), texte: v.analyse) }
                 Text(pied(v)).font(.petit).foregroundStyle(Color.texte3)
             } else {
                 let e = SuiviVideo.etat(post, palier, maintenant: Date())
@@ -187,19 +188,19 @@ private struct VerdictPalier: View {
     private func message(_ e: EtatPalier) -> String {
         let du = Fmt.jour(SuiviVideo.ajouterHeures(post.publieLe, palier.cible)), limite = Fmt.jour(SuiviVideo.ajouterHeures(post.publieLe, palier.limite))
         switch e {
-        case .aAttendre: return "Pas encore l'heure : relevé prévu le \(du)."
-        case .aReleve: return "Relevé à faire maintenant (utile jusqu'au \(limite)). Réseaux écrit ensuite le verdict."
-        case .aJuger: return "Relevé fait, verdict à écrire par Réseaux."
-        case .manque: return "Relevé manqué : la fenêtre s'est fermée le \(limite)."
+        case .aAttendre: return L("Pas encore l'heure : relevé prévu le \(du).")
+        case .aReleve: return L("Relevé à faire maintenant (utile jusqu'au \(limite)). Réseaux écrit ensuite le verdict.")
+        case .aJuger: return L("Relevé fait, verdict à écrire par Réseaux.")
+        case .manque: return L("Relevé manqué : la fenêtre s'est fermée le \(limite).")
         case .fait: return ""
         }
     }
 
     private func pied(_ v: VerdictVideo) -> String {
         var p: [String] = []
-        if !v.baseReleveLe.isEmpty { p.append("d'après le relevé du " + Fmt.jour(v.baseReleveLe)) }
-        if !v.par.isEmpty { p.append("par " + v.par) }
-        if !v.ecritLe.isEmpty { p.append("écrit le " + Fmt.jour(v.ecritLe)) }
+        if !v.baseReleveLe.isEmpty { p.append(L("d'après le relevé du \(Fmt.jour(v.baseReleveLe))")) }
+        if !v.par.isEmpty { p.append(L("par \(v.par)")) }
+        if !v.ecritLe.isEmpty { p.append(L("écrit le \(Fmt.jour(v.ecritLe))")) }
         return p.joined(separator: " · ")
     }
 }
@@ -227,7 +228,8 @@ private struct FichePostVue: View {
     private var entete: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(post.titre.isEmpty ? post.ref : post.titre).font(.titrePage).tracking(-0.6).foregroundStyle(Color.texte)
-            Text("\(post.reseau) · \(post.compte) \(post.pseudo.isEmpty ? "" : "(\(post.pseudo))") · publiée le \(Fmt.jour(post.publieLe))")
+            let pseudo = post.pseudo.isEmpty ? "" : " (\(post.pseudo))"
+            Text(L("\(post.reseau) · \(post.compte)\(pseudo) · publiée le \(Fmt.jour(post.publieLe))"))
                 .font(.ligne).foregroundStyle(Color.texte2)
             let infos = self.infos
             if !infos.isEmpty { Text(infos.joined(separator: " · ")).font(.secondaire).foregroundStyle(Color.texte2) }
@@ -236,17 +238,17 @@ private struct FichePostVue: View {
 
     private var infos: [String] {
         var infos: [String] = []
-        if !post.format.isEmpty { infos.append("Format : " + post.format) }
-        if let d = post.dureeS { infos.append("Durée : " + Fmt.secondes(d)) }
-        if post.promoEur > 0 { infos.append("Promo : \(Fmt.decimal(post.promoEur)) €") }
-        if let s = post.sujetPlanning { infos.append("Sujet du planning : " + s) }
-        if !post.visible { infos.append("Archivée ou masquée") }
+        if !post.format.isEmpty { infos.append(L("Format : \(post.format)")) }
+        if let d = post.dureeS { infos.append(L("Durée : \(Fmt.secondes(d))")) }
+        if post.promoEur > 0 { infos.append(L("Promo : \(Fmt.decimal(post.promoEur)) €")) }
+        if let s = post.sujetPlanning { infos.append(L("Sujet du planning : \(s)")) }
+        if !post.visible { infos.append(L("Archivée ou masquée")) }
         return infos
     }
 
     // Les verdicts d'abord : « a-t-elle marché, pourquoi, qu'est-ce qu'on retient ». Un par relevé : l'analyse de fond est celle du 7 jours.
     private var verdict: some View {
-        CarteStats(titre: "Verdict") {
+        CarteStats(titre: L("Verdict")) {
             VStack(alignment: .leading, spacing: 18) {
                 VerdictPalier(post: post, palier: .j7)
                 VerdictPalier(post: post, palier: .h48)
@@ -254,8 +256,8 @@ private struct FichePostVue: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Lecture précoce (avant 24 h, ne compte pas pour le 48 h)").font(.ligneForte).foregroundStyle(Color.texte)
                         Pastille(texte: VerdictVocabulaire.libelle(v.verdict), couleur: couleurVerdict(v.verdict))
-                        if !v.pourquoi.isEmpty { Bloc(titre: "Pourquoi", texte: v.pourquoi) }
-                        if !v.baseReleveLe.isEmpty { Text("D'après le relevé du " + Fmt.jour(v.baseReleveLe)).font(.petit).foregroundStyle(Color.texte3) }
+                        if !v.pourquoi.isEmpty { Bloc(titre: L("Pourquoi"), texte: v.pourquoi) }
+                        if !v.baseReleveLe.isEmpty { Text(L("D'après le relevé du \(Fmt.jour(v.baseReleveLe))")).font(.petit).foregroundStyle(Color.texte3) }
                     }
                 }
             }
@@ -265,35 +267,35 @@ private struct FichePostVue: View {
     private func tempsMoyen(_ t: Double?) -> String {
         guard let t else { return "—" }
         guard let d = post.dureeS, d > 0 else { return Fmt.secondes(t) }
-        return Fmt.secondes(t) + " sur " + Fmt.secondes(d) + " (" + Fmt.pct(t / d * 100) + ")"
+        return L("\(Fmt.secondes(t)) sur \(Fmt.secondes(d)) (\(Fmt.pct(t / d * 100)))")
     }
 
     private var resultats: some View {
-        CarteStats(titre: "Résultats") {
+        CarteStats(titre: L("Résultats")) {
             HStack(alignment: .top, spacing: 14) {
-                Palier(titre: "À 48 h", releve: post.releve(.h48), vide: "Pas relevé à 48 h")
-                Palier(titre: "À 7 jours", releve: post.releve(.j7), vide: "Pas relevé à 7 jours")
+                Palier(titre: L("À 48 h"), releve: post.releve(.h48), vide: L("Pas relevé à 48 h"))
+                Palier(titre: L("À 7 jours"), releve: post.releve(.j7), vide: L("Pas relevé à 7 jours"))
             }
         }
     }
 
     // La rétention vient du dernier relevé qui la donne ; le moment où les gens décrochent n'existe que si Réseaux l'a noté (courbe du Studio).
     private var retention: some View {
-        CarteStats(titre: "Où les gens restent") {
+        CarteStats(titre: L("Où les gens restent")) {
             VStack(alignment: .leading, spacing: 8) {
                 if let r = post.releveRetention {
-                    Ligne("Restés après 3 s", Fmt.pct(r.r3sPct))
-                    Ligne("Temps moyen regardé", tempsMoyen(r.tempsMoyenS))
-                    Ligne("Vue en entier", Fmt.pct(r.vueEntierPct))
+                    Ligne(L("Restés après 3 s"), Fmt.pct(r.r3sPct))
+                    Ligne(L("Temps moyen regardé"), tempsMoyen(r.tempsMoyenS))
+                    Ligne(L("Vue en entier"), Fmt.pct(r.vueEntierPct))
                     if r.pourToiPct != nil || r.recherchePct != nil {
-                        Ligne("Vient de « Pour toi » / de la recherche", "\(Fmt.pct(r.pourToiPct)) / \(Fmt.pct(r.recherchePct))")
+                        Ligne(L("Vient de « Pour toi » / de la recherche"), "\(Fmt.pct(r.pourToiPct)) / \(Fmt.pct(r.recherchePct))")
                     }
                     Text("Relevé du \(Fmt.jour(r.releveLe)) (\(r.delaiTexte) après la publication, \(r.source)).").font(.petit).foregroundStyle(Color.texte3)
                 } else {
                     Text("Pas de rétention relevée pour cette vidéo (ni 3 s, ni temps moyen, ni vue entière).").font(.secondaire).foregroundStyle(Color.texte2)
                 }
                 if let v = post.verdicts.first(where: { $0.decrochageS != nil }), let s = v.decrochageS {
-                    Ligne("Les gens décrochent vers", Fmt.secondes(s))
+                    Ligne(L("Les gens décrochent vers"), Fmt.secondes(s))
                     if !v.decrochageNote.isEmpty { Text(v.decrochageNote).font(.secondaire).foregroundStyle(Color.texte2) }
                 } else {
                     Text("Moment du décrochage : pas relevé (la courbe du Studio n'est pas dans les chiffres).").font(.petit).foregroundStyle(Color.texte3)
@@ -303,14 +305,14 @@ private struct FichePostVue: View {
     }
 
     private var conversions: some View {
-        CarteStats(titre: "Ce que ça a fait venir") {
+        CarteStats(titre: L("Ce que ça a fait venir")) {
             VStack(alignment: .leading, spacing: 8) {
                 if post.conversions.isEmpty {
                     Text("Pas encore de relevé de conversions pour la période de cette vidéo.").font(.secondaire).foregroundStyle(Color.texte2)
                 } else {
                     ForEach(post.conversions, id: \.source) { c in
-                        Ligne(c.source == ConversionLigne.total ? "Toutes visites du lien suivi" : "Clics, source « \(c.source) »",
-                              [c.clics.map { Fmt.nombre($0) + " visites" }, c.inscriptions.map { Fmt.nombre($0) + " inscrits" }]
+                        Ligne(c.source == ConversionLigne.total ? L("Toutes visites du lien suivi") : L("Clics, source « \(c.source) »"),
+                              [c.clics.map { L("\(Fmt.nombre($0)) visites") }, c.inscriptions.map { L("\(Fmt.nombre($0)) inscrits") }]
                                 .compactMap { $0 }.joined(separator: " · ").nonVide("—"))
                         Text("période \(c.periode)").font(.petit).foregroundStyle(Color.texte3)
                     }
@@ -322,19 +324,19 @@ private struct FichePostVue: View {
     }
 
     private var tousLesReleves: some View {
-        CarteStats(titre: "Tous les relevés (\(post.releves.count))") {
+        CarteStats(titre: L("Tous les relevés (\(post.releves.count))")) {
             if post.releves.isEmpty {
                 Text("Aucun relevé.").font(.secondaire).foregroundStyle(Color.texte2)
             } else {
                 Grid(alignment: .trailing, horizontalSpacing: 14, verticalSpacing: 6) {
                     GridRow {
-                        titreColonne("Après").gridColumnAlignment(.leading); titreColonne("Vues"); titreColonne("J'aime"); titreColonne("Comm."); titreColonne("Partages"); titreColonne("Enreg.")
-                        titreColonne("Temps moy."); titreColonne("3 s"); titreColonne("Entière"); titreColonne("Abonnés")
+                        titreColonne(L("Après")).gridColumnAlignment(.leading); titreColonne(L("Vues")); titreColonne(L("J'aime")); titreColonne(L("Comm.")); titreColonne(L("Partages")); titreColonne(L("Enreg."))
+                        titreColonne(L("Temps moy.")); titreColonne(L("3 s")); titreColonne(L("Entière")); titreColonne(L("Abonnés"))
                     }
                     Divider().gridCellUnsizedAxes(.horizontal)
                     ForEach(Array(post.releves.enumerated()), id: \.offset) { _, r in
                         GridRow {
-                            Text("\(r.delaiTexte) · \(Fmt.court(r.releveLe))").foregroundStyle(Color.texte).gridColumnAlignment(.leading)
+                            Text(verbatim: "\(r.delaiTexte) · \(Fmt.court(r.releveLe))").foregroundStyle(Color.texte).gridColumnAlignment(.leading)
                             Text(Fmt.nombre(r.vues)); Text(Fmt.nombre(r.likes)); Text(Fmt.nombre(r.commentaires)); Text(Fmt.nombre(r.partages))
                             Text(Fmt.nombre(r.enregistrements)); Text(Fmt.secondes(r.tempsMoyenS)); Text(Fmt.pct(r.r3sPct))
                             Text(Fmt.pct(r.vueEntierPct)); Text(Fmt.nombre(r.abonnesGagnes))
@@ -399,7 +401,7 @@ private struct Palier: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(titre).font(.petit.weight(.semibold)).foregroundStyle(Color.texte3)
             if let r = releve {
-                Text(Fmt.nombre(r.vues) + " vues").font(.titreSection).foregroundStyle(Color.texte)
+                Text(L("\(Fmt.nombre(r.vues)) vues")).font(.titreSection).foregroundStyle(Color.texte)
                 Text("\(Fmt.nombre(r.likes)) j'aime · \(Fmt.nombre(r.commentaires)) comm. · \(Fmt.nombre(r.partages)) partages · \(Fmt.nombre(r.enregistrements)) enreg.")
                     .font(.secondaire).foregroundStyle(Color.texte2)
                 Text("\(Fmt.nombre(r.abonnesGagnes)) abonnés gagnés").font(.secondaire).foregroundStyle(Color.texte2)

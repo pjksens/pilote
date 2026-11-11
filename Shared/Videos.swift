@@ -17,13 +17,23 @@ struct Video: Identifiable, Hashable, Codable {
 }
 
 enum VideoVocabulaire {
-    static let comptes: [(String, String)] = [("kryva", "KRYVA"), ("perso", "Perso")]
-    static let statuts: [(String, String)] = [
+    /// Les libellés sont calculés à l'appel : la langue de l'app se lit à ce moment-là (docs/LOCALISATION.md).
+    static var comptes: [(String, String)] { [("kryva", "KRYVA"), ("perso", L("Perso"))] }
+    static var statuts: [(String, String)] {
+        [("a_choisir", L("Sujet à choisir")), ("valide", L("Sujet validé")), ("tournee", L("Tournée, en montage")),
+         ("prete", L("Prête")), ("publiee", L("Publiée")), ("annulee", L("Annulée"))]
+    }
+    static func compte(_ c: String) -> String { Libelles.libelle(comptes, c) }
+    static func statut(_ s: String) -> String { Libelles.libelle(statuts, s) }
+
+    /// Les mêmes libellés en français, pour ce qui s'écrit en base (journal, décisions) : les équipes d'agents travaillent en français.
+    static let comptesFrancais: [(String, String)] = [("kryva", "KRYVA"), ("perso", "Perso")]
+    static let statutsFrancais: [(String, String)] = [
         ("a_choisir", "Sujet à choisir"), ("valide", "Sujet validé"), ("tournee", "Tournée, en montage"),
         ("prete", "Prête"), ("publiee", "Publiée"), ("annulee", "Annulée"),
     ]
-    static func compte(_ c: String) -> String { Libelles.libelle(comptes, c) }
-    static func statut(_ s: String) -> String { Libelles.libelle(statuts, s) }
+    static func compteFrancais(_ c: String) -> String { Libelles.libelle(comptesFrancais, c) }
+    static func statutFrancais(_ s: String) -> String { Libelles.libelle(statutsFrancais, s) }
 }
 
 /// Ce que l'écran montre pour une vidéo, selon le jour : un mot et une couleur.
@@ -85,22 +95,22 @@ enum VideoCalcul {
     /// Le mot de la case : « Publiée », « Prête », « Montage », « À tourner », « Ratée »…
     static func affichage(_ v: Video?, jour: String, aujourdhui: String) -> (texte: String, ton: TonVideo) {
         guard let v, v.statut != "a_choisir" else {
-            if jour < aujourdhui { return ("Rien", .rouge) }
-            return ("Sujet ?", jour <= lendemainOuvre(aujourdhui) ? .rouge : .neutre)
+            if jour < aujourdhui { return (L("Rien"), .rouge) }
+            return (L("Sujet ?"), jour <= lendemainOuvre(aujourdhui) ? .rouge : .neutre)
         }
         switch v.statut {
-        case "publiee": return ("Publiée", .vert)
-        case "annulee": return ("Annulée", .neutre)
+        case "publiee": return (L("Publiée"), .vert)
+        case "annulee": return (L("Annulée"), .neutre)
         default: break
         }
-        if jour < aujourdhui { return ("Ratée", .rouge) }
+        if jour < aujourdhui { return (L("Ratée"), .rouge) }
         switch v.statut {
-        case "prete": return ("Prête", .vert)
-        case "tournee": return ("Montage", .ambre)
+        case "prete": return (L("Prête"), .vert)
+        case "tournee": return (L("Montage"), .ambre)
         default:
-            if jour == aujourdhui { return ("Pas tournée", .rouge) }
-            if veilleOuvree(jour) <= aujourdhui { return ("À tourner", .ambre) }
-            return ("Validée", .neutre)
+            if jour == aujourdhui { return (L("Pas tournée"), .rouge) }
+            if veilleOuvree(jour) <= aujourdhui { return (L("À tourner"), .ambre) }
+            return (L("Validée"), .neutre)
         }
     }
 }
@@ -156,13 +166,13 @@ extension Stockage {
         }
         if let j = champs["jour"] as? String, !j.isEmpty {
             guard Dates.jour.date(from: j) != nil, j.count == 10 else { throw ErreurVideo(description: "jour attendu au format AAAA-MM-JJ") }
-            guard VideoCalcul.estOuvre(j) else { throw ErreurVideo(description: "\(j) est un samedi ou un dimanche : rien le week-end") }
+            guard VideoCalcul.estOuvre(j) else { throw ErreurVideo(description: L("\(j) est un samedi ou un dimanche : rien le week-end")) }
         }
         let maintenant = Dates.maintenant()
         var existant: Video?
         if let id = champs["id"] as? String, !id.isEmpty {
             existant = try video(id)
-            if existant == nil { throw ErreurVideo(description: "vidéo introuvable : \(id)") }
+            if existant == nil { throw ErreurVideo(description: L("vidéo introuvable : \(id)")) }
         } else if let j = champs["jour"] as? String, !j.isEmpty {
             let compte = champs["compte"] as? String ?? "kryva"
             existant = try base.lignes("SELECT * FROM videos WHERE jour = ? AND compte = ? AND supprime_le = '' LIMIT 1", [j, compte])
@@ -220,13 +230,16 @@ struct DernierEchange: Hashable, Codable {
     let texte: String
 
     /// « Mail envoyé le 21 oct. », « A répondu par SMS le 28 oct. »
+    /// Toujours en français (consignes aux agents, journal) ; l'écran lit `resumeAffiche`, dans la langue de l'app.
     var resume: String {
-        let quand = Dates.court(le)
-        let canal = Libelles.canal(self.canal)
-        switch sens {
-        case "entrant": return "A répondu (\(canal)) le \(quand)"
-        case "sortant": return self.canal == "autre" ? "\(Libelles.typeEvenement(type)) envoyé le \(quand)" : "\(canal) envoyé le \(quand)"
-        default: return "\(Libelles.typeEvenement(type)) le \(quand)"
+        Loc.enFrancais { () -> String in
+            let quand = Dates.court(le)
+            let canal = Libelles.canal(self.canal)
+            switch sens {
+            case "entrant": return L("A répondu (\(canal)) le \(quand)")
+            case "sortant": return self.canal == "autre" ? L("\(Libelles.typeEvenement(type)) envoyé le \(quand)") : L("\(canal) envoyé le \(quand)")
+            default: return L("\(Libelles.typeEvenement(type)) le \(quand)")
+            }
         }
     }
 

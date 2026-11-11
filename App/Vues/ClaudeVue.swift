@@ -20,13 +20,13 @@ struct ClaudeVue: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                EnTete(titre: "Agents", detail: "Ce que font vos sessions Claude Code en ce moment, et le journal de ce qu'elles ont fait")
+                EnTete(titre: L("Agents"), detail: L("Ce que font vos sessions Claude Code en ce moment, et le journal de ce qu'elles ont fait"))
                 PyramideCompacte(pyramide: etat.pyramide, charge: etat.pyramideChargee)
                 HStack(alignment: .top, spacing: 20) {
                     carteJournal.frame(maxWidth: .infinity)
                     VStack(spacing: 20) {
                         carteRoutines
-                        carte(titre: "Récentes", liste: recentes, vide: "Aucune session récente.")
+                        carte(titre: L("Récentes"), liste: recentes, vide: L("Aucune session récente."))
                     }
                     .frame(width: 380)
                 }
@@ -35,14 +35,14 @@ struct ClaudeVue: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                BoutonPrincipal(titre: "Nouvelle session", symbole: "plus") { feuille = true }
+                BoutonPrincipal(titre: L("Nouvelle session"), symbole: "plus") { feuille = true }
             }
         }
         .sheet(isPresented: $feuille) { NouvelleSession() }
     }
 
     private var carteJournal: some View {
-        Carte(titre: "Journal") {
+        Carte(titre: L("Journal")) {
             Picker("", selection: $filtreJournal) {
                 Text("Tout").tag("tout")
                 Text("Livrables et notes").tag("livrables")
@@ -51,8 +51,8 @@ struct ClaudeVue: View {
             .padding(.horizontal, 16).padding(.bottom, 8)
             if entrees.isEmpty {
                 EtatVide(texte: filtreJournal == "tout"
-                         ? "Le journal se remplit à la fin de chaque réponse des sessions (à partir de leur prochain démarrage)."
-                         : "Aucun livrable noté pour l'instant.")
+                         ? L("Le journal se remplit à la fin de chaque réponse des sessions (à partir de leur prochain démarrage).")
+                         : L("Aucun livrable noté pour l'instant."))
             } else {
                 ForEach(Array(entrees.enumerated()), id: \.element.id) { i, e in
                     LigneCarte(dernier: i == entrees.count - 1) { LigneJournal(entree: e, avecProjet: true) }
@@ -64,7 +64,7 @@ struct ClaudeVue: View {
     private func carte(titre: String, liste: [SessionClaude], vide: String) -> some View {
         Carte(titre: titre, detail: liste.isEmpty ? nil : "\(liste.count)") {
             if !etat.recentesChargees {
-                EtatChargement(texte: "Lecture des sessions…")
+                EtatChargement(texte: L("Lecture des sessions…"))
             } else if liste.isEmpty {
                 EtatVide(texte: vide)
             } else {
@@ -78,9 +78,9 @@ struct ClaudeVue: View {
     }
 
     private var carteRoutines: some View {
-        Carte(titre: "Routines") {
+        Carte(titre: L("Routines")) {
             if Claude.routines.isEmpty {
-                EtatVide(texte: "Aucune routine : ajoutez les vôtres dans reglages.json (routines).")
+                EtatVide(texte: L("Aucune routine : ajoutez les vôtres dans reglages.json (routines)."))
             }
             ForEach(Array(Claude.routines.enumerated()), id: \.element.id) { i, r in
                 LigneCarte(dernier: i == Claude.routines.count - 1) {
@@ -120,8 +120,8 @@ struct LigneActivite: View {
                     }
                 }
                 if a.etat == "busy" {
-                    if !a.etape.isEmpty { ligne("Étape", a.etape) }
-                    if !a.action.isEmpty { ligne("Fait", a.action, quand: a.actionLe) }
+                    if !a.etape.isEmpty { ligne(L("Étape"), a.etape) }
+                    if !a.action.isEmpty { ligne(L("Fait"), a.action, quand: a.actionLe) }
                 } else if !a.recap.isEmpty {
                     Text(a.recap).font(.secondaire).foregroundStyle(Color.texte).lineLimit(3)
                 }
@@ -139,7 +139,7 @@ struct LigneActivite: View {
                         .help("Taille du contexte que la session relit à chaque action. Elle se résume toute seule vers 170 k (réglage autoCompactWindow à 200 k). Orange : au-dessus, elle se résumera à sa prochaine action. Rouge : elle travaille au-delà de 300 k, le résumé automatique n'a pas pris ; l'ouvrir et taper /compact.")
                 }
                 if let d = a.depuis {
-                    Text(d.formatted(.relative(presentation: .named).locale(Locale(identifier: "fr_FR"))))
+                    Text(d.formatted(.relative(presentation: .named).locale(Loc.locale)))
                         .font(.petit).foregroundStyle(Color.texte3)
                 }
                 if !a.sessionApp.isEmpty {
@@ -154,7 +154,7 @@ struct LigneActivite: View {
             Text(titre).font(.petit.weight(.medium)).foregroundStyle(Color.texte3).frame(width: 40, alignment: .leading)
             Text(texte).font(.secondaire).foregroundStyle(Color.texte).lineLimit(2)
             if let quand {
-                Text(quand.formatted(.relative(presentation: .numeric).locale(Locale(identifier: "fr_FR"))))
+                Text(quand.formatted(.relative(presentation: .numeric).locale(Loc.locale)))
                     .font(.petit).foregroundStyle(Color.texte3)
             }
         }
@@ -173,12 +173,12 @@ struct LigneJournal: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let d = Dates.date(e.le) {
-                    Text(d.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(Locale(identifier: "fr_FR"))))
+                    Text(Loc.date(d, "dMMM") + " " + Libelles.heureFormat.string(from: d))
                         .font(.petit.monospacedDigit()).foregroundStyle(Color.texte3)
                 }
-                Text(e.titreSession.isEmpty ? "Session" : e.titreSession).font(.secondaire.weight(.semibold))
+                Text(e.titreSession.isEmpty ? L("Session") : e.titreSession).font(.secondaire.weight(.semibold))
                     .foregroundStyle(Color.texte).lineLimit(1)
-                if e.type != "tour" { Pastille(texte: e.type == "livrable" ? "Livrable" : "Note", couleur: .vert) }
+                if e.type != "tour" { Pastille(texte: e.type == "livrable" ? L("Livrable") : L("Note"), couleur: .vert) }
                 if avecProjet, let p = etat.projets.first(where: { $0.id == e.projetId }) {
                     Button(p.nom) { etat.ouvrir(projet: p.id) }.buttonStyle(.link).font(.petit)
                 }
@@ -203,7 +203,7 @@ struct LigneJournal: View {
                     .buttonStyle(.plain).foregroundStyle(Color.texte2).help(Chemins.court(f))
                 }
                 if !ouvert, e.listeFichiers.count > 3 {
-                    Text("et \(e.listeFichiers.count - 3) autres fichiers").font(.petit).foregroundStyle(Color.texte3)
+                    Text(L("et \(e.listeFichiers.count - 3) autres fichiers")).font(.petit).foregroundStyle(Color.texte3)
                 }
             }
         }
@@ -225,7 +225,7 @@ struct LigneSession: View {
                     Text(session.libelleEtat).font(.secondaire).foregroundStyle(session.etat == "waiting" ? Color.ambre : Color.texte2)
                 }
                 if let d = session.derniereActivite {
-                    Text(d.formatted(.relative(presentation: .named).locale(Locale(identifier: "fr_FR"))))
+                    Text(d.formatted(.relative(presentation: .named).locale(Loc.locale)))
                         .font(.petit).foregroundStyle(Color.texte3)
                 }
             }

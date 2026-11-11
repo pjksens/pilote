@@ -190,32 +190,36 @@ extension Stockage {
     static func preuve(reste: Bool, devenue: String, faitAuFil: Bool) -> String {
         if reste { return "reste" }
         if faitAuFil { return "faite" }
-        if devenue.hasPrefix("suite le") { return "reportee" }
-        if devenue == "traitée" { return "sans_trace" }
+        // `devenue` est le texte affiché : on le compare avec les mêmes L(…) que `devenue(_:reste:chezSacha:jour:)`.
+        if devenue.hasPrefix(suiteLe("")) { return "reportee" }
+        if devenue == L("traitée") { return "sans_trace" }
         return "faite"
     }
 
+    /// « suite le 12/11 » : la forme que `devenue` écrit et que `preuve` reconnaît (une seule écriture pour les deux).
+    static func suiteLe(_ jjmm: String) -> String { L("suite le \(jjmm)") }
+
     static func devenue(_ c: Contact, reste: Bool, chezSacha: Bool, jour: String) -> String {
         if reste {
-            if c.prochaineDate.isEmpty { return "sans date : à dater ou à classer" }
-            return c.prochaineDate < jour ? "en retard depuis le \(Dates.jjmm(c.prochaineDate))" : "due aujourd'hui"
+            if c.prochaineDate.isEmpty { return L("sans date : à dater ou à classer") }
+            return c.prochaineDate < jour ? L("en retard depuis le \(Dates.jjmm(c.prochaineDate))") : L("due aujourd'hui")
         }
-        if c.nePlusContacter { return "ne plus contacter" }
-        if c.etape == "gagne" { return "classée gagnée" }
-        if c.etape == "perdu" { return "classée perdue" }
-        if chezSacha { return "texte pour vous" }
-        if Libelles.pourSacha(c.prochaineAction) { return "passée à vous" }
-        if !c.prochaineDate.isEmpty { return "suite le \(Dates.jjmm(c.prochaineDate))" }
-        return "traitée"
+        if c.nePlusContacter { return L("ne plus contacter") }
+        if c.etape == "gagne" { return L("classée gagnée") }
+        if c.etape == "perdu" { return L("classée perdue") }
+        if chezSacha { return L("texte pour vous") }
+        if Libelles.pourSacha(c.prochaineAction) { return L("passée à vous") }
+        if !c.prochaineDate.isEmpty { return suiteLe(Dates.jjmm(c.prochaineDate)) }
+        return L("traitée")
     }
 
     /// Le message « Relancer » : les fiches qui restent, puis la consigne du matin.
     static func relance(_ j: JourneeAgent, heure: Date = Date()) -> String {
-        let h = heure.formatted(date: .omitted, time: .shortened)
+        let h = Libelles.heureFormat.string(from: heure)   // la consigne part en français : « 14:30 », pas l'heure de la langue de l'écran
         let lignes = j.restantes.map { f in
             let action = Libelles.sansDateEnTete(f.contact.prochaineAction).replacingOccurrences(of: "\n", with: " ")
             let court = action.count > 90 ? String(action.prefix(90)) + "…" : action
-            return "- \(f.contact.nom) (\(f.devenue)) : \(court.isEmpty ? "aucune action" : court)"
+            return "- \(f.contact.nomAffiche) (\(f.devenue)) : \(court.isEmpty ? "aucune action" : court)"
         }
         return """
         Relance de \(Moi.nom) (\(h)) : \(j.restantes.count) fiche\(j.restantes.count > 1 ? "s" : "") de ta liste du jour \
