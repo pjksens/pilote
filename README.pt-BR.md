@@ -3,6 +3,11 @@
 </p>
 
 <p align="center">
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM"><img src="docs/media/film.jpg" width="300" alt="Filme do Pilote, assistir no YouTube"></a><br>
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM">▶ Assistir ao filme (51 s)</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white" alt="Swift e SwiftUI">
   <img src="https://img.shields.io/badge/Claude%20Code-MCP%20server-C2502C" alt="Funciona com o Claude Code (servidor MCP)">

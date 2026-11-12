@@ -3,6 +3,11 @@
 </p>
 
 <p align="center">
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM"><img src="docs/media/film.jpg" width="300" alt="Film Pilote, à voir sur YouTube"></a><br>
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM">▶ Voir le film (51 s)</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white" alt="Swift et SwiftUI">
   <img src="https://img.shields.io/badge/Claude%20Code-serveur%20MCP-C2502C" alt="Branché sur Claude Code (serveur MCP)">

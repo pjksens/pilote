@@ -3,6 +3,11 @@
 </p>
 
 <p align="center">
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM"><img src="docs/media/film.jpg" width="300" alt="YouTube에서 Pilote 영상 보기"></a><br>
+  <a href="https://www.youtube.com/shorts/5psKMdVdgjM">▶ 영상 보기 (51초)</a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?logo=swift&logoColor=white" alt="Swift 및 SwiftUI">
   <img src="https://img.shields.io/badge/Claude%20Code-MCP%20server-C2502C" alt="Claude Code 지원(MCP 서버)">
